@@ -83,6 +83,7 @@ export interface DemoState {
   events: Map<string, ProofEvent[]>;
   verifierTimer: NodeJS.Timeout | null;
   verifierActive: boolean;
+  lastVerifierTickAt: number;
 }
 
 export interface BuyerSessionView {

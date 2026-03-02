@@ -28,6 +28,7 @@ const FAST_DECIMALS = 18;
 const DEFAULT_EXPIRY_MINUTES = 15;
 const RECEIVER_COOLDOWN_MINUTES = 30;
 const VERIFIER_INTERVAL_MS = 5_000;
+const MIN_VERIFIER_TICK_GAP_MS = 2_000;
 const AUTO_DELIVER_ENABLED = (process.env.DEMO_AUTO_DELIVER ?? '1').trim() !== '0';
 const AUTO_DELIVER_DELAY_MS = (() => {
   const parsed = Number(process.env.DEMO_AUTO_DELIVER_DELAY_MS ?? '0');
@@ -547,18 +548,26 @@ async function reconcileIntent(intent: PaymentIntentRecord, nowMs: number): Prom
   }
 }
 
-export async function runVerifierTick(): Promise<void> {
+export async function runVerifierTick(options?: { force?: boolean }): Promise<void> {
   const state = getDemoState();
+  const nowMs = Date.now();
+  if (
+    !options?.force
+    && state.lastVerifierTickAt > 0
+    && nowMs - state.lastVerifierTickAt < MIN_VERIFIER_TICK_GAP_MS
+  ) {
+    return;
+  }
   if (state.verifierActive) return;
   state.verifierActive = true;
 
   try {
-    const nowMs = Date.now();
     const intents = [...state.intents.values()];
     for (const intent of intents) {
       await reconcileIntent(intent, nowMs);
       maybeAutoDeliverIntent(intent, nowMs);
     }
+    state.lastVerifierTickAt = Date.now();
   } finally {
     state.verifierActive = false;
   }
@@ -566,7 +575,12 @@ export async function runVerifierTick(): Promise<void> {
 
 export function ensureVerifierStarted(): void {
   const state = getDemoState();
-  if (state.verifierTimer) return;
+  if (state.verifierTimer) {
+    if (process.env.NODE_ENV === 'production') return;
+    // In dev/HMR, replace previous timer to avoid stale interval callbacks.
+    clearInterval(state.verifierTimer);
+    state.verifierTimer = null;
+  }
 
   state.verifierTimer = setInterval(() => {
     void runVerifierTick();
@@ -807,13 +821,13 @@ export async function payIntent(params: {
     });
   }
 
-  await runVerifierTick();
+  await runVerifierTick({ force: true });
   return toIntentView(intent);
 }
 
 export async function deliverIntent(intentId: string): Promise<PaymentIntentView> {
   ensureVerifierStarted();
-  await runVerifierTick();
+  await runVerifierTick({ force: true });
 
   const intent = getDemoState().intents.get(intentId);
   if (!intent) {
@@ -850,7 +864,7 @@ export async function handlePaymentLinkWebhook(params: {
 
   const nowMs = Date.now();
   applyProviderStatusToIntent(intent, params.status, 'webhook', nowMs);
-  await runVerifierTick();
+  await runVerifierTick({ force: true });
 
   return {
     matched: true,
@@ -863,6 +877,7 @@ export const DEMO_DEFAULTS = {
   expiryMinutes: DEFAULT_EXPIRY_MINUTES,
   receiverCooldownMinutes: RECEIVER_COOLDOWN_MINUTES,
   verifierIntervalMs: VERIFIER_INTERVAL_MS,
+  minVerifierTickGapMs: MIN_VERIFIER_TICK_GAP_MS,
   autoDeliveryEnabled: AUTO_DELIVER_ENABLED,
   autoDeliveryDelayMs: AUTO_DELIVER_DELAY_MS,
 };
