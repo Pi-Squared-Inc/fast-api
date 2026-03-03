@@ -49,7 +49,7 @@ const CHAIN_CONFIGS: Record<string, OmnisetChainConfig> = {
     wsetAddress: '0x485DdBAa2D62ee70D03B4789912948f3aF7E35B8',
     wethAddress: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14',
     fastsetBridgeAddress: 'set1la44katfwdhv9tqvskjrjc5cmy7ufjwvufwz4suuvazua5dtf4js08rgrz',
-    relayerUrl: 'https://omniset.fastset.xyz/ethereum-sepolia-relayer/relay',
+    relayerUrl: 'https://staging.omniset.fastset.xyz/ethereum-sepolia-relayer/relay',
   },
   arbitrum: {
     chainId: 421614,
@@ -57,7 +57,7 @@ const CHAIN_CONFIGS: Record<string, OmnisetChainConfig> = {
     wsetAddress: '0xA0431d49B71c6f07603272C6C580560AfF41598E',
     wethAddress: '0x980b62da83eff3d4576c647993b0c1d7faf17c73',
     fastsetBridgeAddress: 'set1la4pjzupsdwwgx3vu0fvvl6hk4ts3psg2d4g3mlq5yxwqhdjl03sp7ek2u',
-    relayerUrl: 'https://omniset.fastset.xyz/arbitrum-sepolia-relayer/relay',
+    relayerUrl: 'https://staging.omniset.fastset.xyz/arbitrum-sepolia-relayer/relay',
   },
 };
 

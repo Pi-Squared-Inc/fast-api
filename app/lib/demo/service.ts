@@ -34,7 +34,7 @@ const AUTO_DELIVER_DELAY_MS = (() => {
   const parsed = Number(process.env.DEMO_AUTO_DELIVER_DELAY_MS ?? '0');
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 })();
-const FAST_RPC_URL = process.env.FAST_RPC_URL?.trim() || 'https://proxy.fastset.xyz';
+const FAST_RPC_URL = process.env.FAST_RPC_URL?.trim() || 'https://api.fast.xyz/proxy';
 const ARBITRUM_RPC_URL =
   process.env.ARBITRUM_SEPOLIA_RPC_URL?.trim() || 'https://sepolia-rollup.arbitrum.io/rpc';
 const ARBITRUM_EXPLORER_URL =
