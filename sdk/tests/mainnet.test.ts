@@ -21,7 +21,7 @@ const ORIGINAL_CONFIG_DIR = process.env.MONEY_CONFIG_DIR;
 
 function fastTestnetConfig(tmpDir: string) {
   return {
-    rpc: 'https://proxy.fastset.xyz',
+    rpc: 'https://api.fast.xyz/proxy',
     keyfile: path.join(tmpDir, 'keys', 'fast.json'),
     network: 'testnet',
     defaultToken: 'SET',
@@ -30,7 +30,7 @@ function fastTestnetConfig(tmpDir: string) {
 
 function fastMainnetConfig(tmpDir: string) {
   return {
-    rpc: 'https://proxy.fastset.xyz',
+    rpc: 'https://api.fast.xyz/proxy',
     keyfile: path.join(tmpDir, 'keys', 'fast.json'),
     network: 'mainnet',
     defaultToken: 'SET',
