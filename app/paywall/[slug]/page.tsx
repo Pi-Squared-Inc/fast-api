@@ -197,6 +197,7 @@ export default function PaywallCheckoutPage() {
 
   useEffect(() => {
     setIntentId(intentIdFromUrl);
+    setPaymentRequestUrl('');
   }, [intentIdFromUrl]);
 
   useEffect(() => {
@@ -239,9 +240,7 @@ export default function PaywallCheckoutPage() {
         if (cancelled) return;
         setIntent(response.intent);
         setCanUnlock(response.canUnlock);
-        if (!paymentRequestUrl) {
-          setPaymentRequestUrl(buildPaymentRequestUrl(response.intent));
-        }
+        setPaymentRequestUrl(buildPaymentRequestUrl(response.intent));
       } catch (err: unknown) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : String(err);
@@ -257,7 +256,7 @@ export default function PaywallCheckoutPage() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [intentId, paymentRequestUrl]);
+  }, [intentId]);
 
   async function onCreateIntent() {
     if (!slug) return;

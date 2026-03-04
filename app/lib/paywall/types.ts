@@ -42,7 +42,7 @@ export interface PaywallAssetRecord {
 export interface PaywallReceiverAccountRecord {
   receiver_account_id: string;
   address: string;
-  private_key: string;
+  private_key_ref?: string;
   created_at: string;
 }
 
@@ -144,4 +144,3 @@ export interface PaywallIntentView {
   startBlock: string;
   lastScannedBlock: string;
 }
-

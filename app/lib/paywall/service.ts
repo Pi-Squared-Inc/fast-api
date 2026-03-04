@@ -1,8 +1,14 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { formatUnits, parseUnits } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { issueUnlockToken, verifyUnlockToken, hashToken } from './unlock-token';
-import { mutatePaywallStore, readPaywallStore } from './store';
+import {
+  mutatePaywallStore,
+  readPaywallStore,
+  resolvePaywallStoreDir,
+} from './store';
 import {
   assertAllowedPaymentConfig,
   getCurrentBlockNumber,
@@ -30,6 +36,9 @@ const MVP_NETWORK: 'mainnet' = 'mainnet';
 const MVP_TOKEN_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 const MVP_TOKEN_SYMBOL = 'USDC';
 const MVP_DECIMALS = 6;
+const DEFAULT_RECEIVER_KEYS_DIR = path.join(resolvePaywallStoreDir(), 'receiver-keys');
+const RECEIVER_KEYS_DIR =
+  process.env.PAYWALL_RECEIVER_KEYS_DIR?.trim() || DEFAULT_RECEIVER_KEYS_DIR;
 
 export class PaywallError extends Error {
   readonly status: number;
@@ -195,6 +204,35 @@ function buildAgentPaymentUrl(params: {
   return url.toString();
 }
 
+function receiverKeyFilePath(receiverAccountId: string): string {
+  return path.join(RECEIVER_KEYS_DIR, `${receiverAccountId}.key`);
+}
+
+async function persistReceiverPrivateKey(
+  receiverAccountId: string,
+  privateKey: string,
+): Promise<string> {
+  await fs.mkdir(RECEIVER_KEYS_DIR, { recursive: true, mode: 0o700 });
+  const filePath = receiverKeyFilePath(receiverAccountId);
+  await fs.writeFile(filePath, privateKey, {
+    encoding: 'utf-8',
+    mode: 0o600,
+    flag: 'wx',
+  });
+  return path.basename(filePath);
+}
+
+async function deletePersistedReceiverPrivateKey(receiverAccountId: string): Promise<void> {
+  const filePath = receiverKeyFilePath(receiverAccountId);
+  try {
+    await fs.unlink(filePath);
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw err;
+    }
+  }
+}
+
 export interface CreatePaywallProductInput {
   slug?: string;
   title: string;
@@ -224,18 +262,15 @@ export async function createPaywallProduct(
     throw new PaywallError('INVALID_PARAMS', 'Unable to derive a valid slug.');
   }
 
-  const chain = input.chain ?? MVP_CHAIN;
-  const network = input.network ?? MVP_NETWORK;
-  const tokenAddress = input.tokenAddress ?? MVP_TOKEN_ADDRESS;
-  const tokenSymbol = input.tokenSymbol ?? MVP_TOKEN_SYMBOL;
-  const decimals = input.decimals ?? MVP_DECIMALS;
-  const { amountRaw } = parsePositiveAmount(input.amount, decimals);
+  const requestedChain = input.chain ?? MVP_CHAIN;
+  const requestedNetwork = input.network ?? MVP_NETWORK;
+  const requestedTokenAddress = input.tokenAddress ?? MVP_TOKEN_ADDRESS;
 
   try {
     assertAllowedPaymentConfig({
-      chain,
-      network,
-      tokenAddress,
+      chain: requestedChain,
+      network: requestedNetwork,
+      tokenAddress: requestedTokenAddress,
     });
   } catch (err: unknown) {
     throw paywallErrorFromUnknown(
@@ -244,6 +279,29 @@ export async function createPaywallProduct(
       'Unsupported chain/network/token configuration.',
     );
   }
+
+  if (
+    input.tokenSymbol !== undefined
+    && input.tokenSymbol.trim().toUpperCase() !== MVP_TOKEN_SYMBOL
+  ) {
+    throw new PaywallError(
+      'UNSUPPORTED_PAYMENT_CONFIG',
+      `MVP supports only token symbol ${MVP_TOKEN_SYMBOL} for the allowlisted token.`,
+    );
+  }
+  if (input.decimals !== undefined && input.decimals !== MVP_DECIMALS) {
+    throw new PaywallError(
+      'UNSUPPORTED_PAYMENT_CONFIG',
+      `MVP supports only ${MVP_DECIMALS} decimals for the allowlisted token.`,
+    );
+  }
+
+  const chain = MVP_CHAIN;
+  const network = MVP_NETWORK;
+  const tokenAddress = MVP_TOKEN_ADDRESS;
+  const tokenSymbol = MVP_TOKEN_SYMBOL;
+  const decimals = MVP_DECIMALS;
+  const { amountRaw } = parsePositiveAmount(input.amount, decimals);
 
   const assetId = input.assetId?.trim() || makeId('asset');
   const assetData = input.assetData ?? { message: `Unlocked payload for ${title}` };
@@ -368,54 +426,75 @@ export async function createPaywallIntent(params: {
   const receiverAccountId = makeId('recv');
   const createdAt = new Date(nowMs).toISOString();
   const expiresAt = new Date(nowMs + expiryMinutes * 60_000).toISOString();
+  let receiverKeyRef: string;
+  try {
+    receiverKeyRef = await persistReceiverPrivateKey(receiverAccountId, privateKey);
+  } catch (err: unknown) {
+    throw paywallErrorFromUnknown(
+      err,
+      'KEY_STORAGE_FAILED',
+      'Unable to persist receiver key material for this intent.',
+      500,
+    );
+  }
 
-  const intentView = await mutatePaywallStore((store) => {
-    const productId = store.products_by_slug[productSlug];
-    if (!productId || !store.products[productId]) {
-      throw new PaywallError('NOT_FOUND', 'Product not found.', 404);
-    }
-    const product = store.products[productId]!;
-    if (!product.is_active) {
-      throw new PaywallError('PRODUCT_INACTIVE', 'Product is not active.', 409);
-    }
+  let intentView: PaywallIntentView;
+  try {
+    intentView = await mutatePaywallStore((store) => {
+      const productId = store.products_by_slug[productSlug];
+      if (!productId || !store.products[productId]) {
+        throw new PaywallError('NOT_FOUND', 'Product not found.', 404);
+      }
+      const product = store.products[productId]!;
+      if (!product.is_active) {
+        throw new PaywallError('PRODUCT_INACTIVE', 'Product is not active.', 409);
+      }
 
-    store.receiver_accounts[receiverAccountId] = {
-      receiver_account_id: receiverAccountId,
-      address: account.address,
-      private_key: privateKey,
-      created_at: createdAt,
-    };
+      store.receiver_accounts[receiverAccountId] = {
+        receiver_account_id: receiverAccountId,
+        address: account.address,
+        private_key_ref: receiverKeyRef,
+        created_at: createdAt,
+      };
 
-    const intent: PaywallIntentRecord = {
-      intent_id: intentId,
-      product_id: product.product_id,
-      buyer_id: buyerId,
-      status: 'pending_payment',
-      receiver_address: account.address,
-      receiver_account_id: receiverAccountId,
-      chain: product.chain,
-      network: product.network,
-      token_address: product.token_address,
-      token_symbol: product.token_symbol,
-      decimals: product.decimals,
-      requested_amount_raw: product.amount_raw,
-      paid_amount_raw: '0',
-      created_at: createdAt,
-      expires_at: expiresAt,
-      start_block: startBlock.toString(),
-      last_scanned_block: startBlock.toString(),
-    };
-    store.intents[intent.intent_id] = intent;
-    pushEvent(store.payment_events, {
-      intent_id: intent.intent_id,
-      kind: 'intent_created',
-      details_json: JSON.stringify({
-        product_id: intent.product_id,
-        receiver_address: intent.receiver_address,
-      }),
+      const intent: PaywallIntentRecord = {
+        intent_id: intentId,
+        product_id: product.product_id,
+        buyer_id: buyerId,
+        status: 'pending_payment',
+        receiver_address: account.address,
+        receiver_account_id: receiverAccountId,
+        chain: product.chain,
+        network: product.network,
+        token_address: product.token_address,
+        token_symbol: product.token_symbol,
+        decimals: product.decimals,
+        requested_amount_raw: product.amount_raw,
+        paid_amount_raw: '0',
+        created_at: createdAt,
+        expires_at: expiresAt,
+        start_block: startBlock.toString(),
+        last_scanned_block: startBlock.toString(),
+      };
+      store.intents[intent.intent_id] = intent;
+      pushEvent(store.payment_events, {
+        intent_id: intent.intent_id,
+        kind: 'intent_created',
+        details_json: JSON.stringify({
+          product_id: intent.product_id,
+          receiver_address: intent.receiver_address,
+        }),
+      });
+      return toIntentView(intent);
     });
-    return toIntentView(intent);
-  });
+  } catch (err: unknown) {
+    try {
+      await deletePersistedReceiverPrivateKey(receiverAccountId);
+    } catch {
+      // best-effort cleanup for orphaned key files
+    }
+    throw err;
+  }
 
   const paymentAmountHuman = intentView.requestedAmount;
   const paymentRequestUrl = buildAgentPaymentUrl({

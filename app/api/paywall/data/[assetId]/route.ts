@@ -13,8 +13,7 @@ function readUnlockToken(request: Request): string | null {
       return token;
     }
   }
-  const url = new URL(request.url);
-  return url.searchParams.get('token')?.trim() || null;
+  return null;
 }
 
 export async function GET(
@@ -27,7 +26,7 @@ export async function GET(
     if (!token) {
       throw new PaywallError(
         'UNAUTHORIZED',
-        'Missing unlock token. Use Authorization: Bearer <token> or ?token=.',
+        'Missing unlock token. Use Authorization: Bearer <token>.',
         401,
       );
     }
