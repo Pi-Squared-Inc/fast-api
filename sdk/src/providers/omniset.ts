@@ -421,10 +421,9 @@ export const omnisetProvider: BridgeProvider = {
       // Step 2 — Cross-sign the transfer certificate via OmniSet
       const transferCrossSign = await crossSignCertificate(transferResult.certificate);
 
-      // Step 3 — Compute transferClaimHash (EIP-191 message hash of the signed transaction bytes)
-      const transferClaimHash = hashMessage({
-        raw: new Uint8Array(transferCrossSign.transaction),
-      });
+      // Step 3 — transferFastTxId is the keccak256 hash of BCS-serialized transaction
+      // This is already computed by the fast adapter's hashTransaction function
+      const transferFastTxId = transferResult.txHash as `0x${string}`;
 
       // Step 4 — Build IntentClaim ABI-encoded bytes
       // DynamicTransfer payload: (tokenAddress, recipient)
@@ -436,12 +435,16 @@ export const omnisetProvider: BridgeProvider = {
         ],
       );
 
-      // IntentClaim struct ABI encoding
+      // Deadline: 1 hour from now (block.timestamp format)
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
+
+      // IntentClaim struct ABI encoding (updated struct with deadline field)
       const intentClaimEncoded = encodeAbiParameters(
         [{
           type: 'tuple',
           components: [
-            { name: 'transferClaimHash', type: 'bytes32' },
+            { name: 'transferFastTxId', type: 'bytes32' },
+            { name: 'deadline', type: 'uint256' },
             {
               name: 'intents',
               type: 'tuple[]',
@@ -454,7 +457,8 @@ export const omnisetProvider: BridgeProvider = {
           ],
         }],
         [{
-          transferClaimHash: transferClaimHash as `0x${string}`,
+          transferFastTxId: transferFastTxId as `0x${string}`,
+          deadline,
           intents: [{
             action: 1,  // DynamicTransfer
             payload: dynamicTransferPayload,
@@ -479,7 +483,7 @@ export const omnisetProvider: BridgeProvider = {
       const relayerBody = {
         encoded_transfer_claim: Array.from(new Uint8Array(transferCrossSign.transaction.map(Number))),
         transfer_proof: transferCrossSign.signature,
-        transfer_fast_tx_id: transferResult.txHash,
+        transfer_claim_id: transferResult.txHash,
         fastset_address: params.senderAddress,
         external_address: params.receiverAddress,
         encoded_intent_claim: Array.from(new Uint8Array(intentCrossSign.transaction.map(Number))),
@@ -508,7 +512,7 @@ export const omnisetProvider: BridgeProvider = {
 
       return {
         txHash: transferResult.txHash,
-        orderId: transferClaimHash,
+        orderId: transferFastTxId,
         estimatedTime: '1-5 minutes',
       };
     } catch (err: unknown) {
