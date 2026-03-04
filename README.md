@@ -168,6 +168,15 @@ npm run build:sdk && node --test --test-force-exit dist/tests/config.test.js
 
 See [AGENTS.md](./AGENTS.md) for full coding guidelines, project layout, and conventions.
 
+## Paywall Storage
+
+The paywall server API under `app/api/paywall/*` supports two state backends:
+
+- `PAYWALL_STORE_DRIVER=file` (default): JSON file store for local/dev demo usage.
+- `PAYWALL_STORE_DRIVER=postgres`: durable production storage.
+  - Requires `PAYWALL_DATABASE_URL` (or `DATABASE_URL`).
+  - Optional: `PAYWALL_POSTGRES_STORE_KEY` (default `default`), `PAYWALL_DATABASE_SSL=require`.
+
 ## Architecture
 
 ```

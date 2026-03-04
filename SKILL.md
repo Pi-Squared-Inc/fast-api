@@ -241,6 +241,12 @@ Operational notes:
 - Status is verified server-side from chain transfer logs (with confirmations).
 - Repeated verifier failures transition an intent to `failed` (threshold via `PAYWALL_MAX_VERIFIER_FAILURES`, default `3`).
 - Signed webhook ingestion route: `POST /api/paywall/webhooks/<provider>`.
+- Paywall state storage driver is selected via `PAYWALL_STORE_DRIVER`:
+  - `file` (default): local JSON store (`PAYWALL_STORE_PATH` or `/tmp/...`), good for demo/dev.
+  - `postgres`: durable DB-backed state; requires `PAYWALL_DATABASE_URL` (or `DATABASE_URL`).
+- Optional postgres settings:
+  - `PAYWALL_POSTGRES_STORE_KEY` to namespace a store row (default `default`).
+  - `PAYWALL_DATABASE_SSL=require` for managed Postgres TLS.
 - Unlock token TTL defaults to 10 minutes.
 - Unlock token is one-time use; first successful data fetch consumes it.
 
