@@ -131,6 +131,11 @@ export default function DemoPage() {
   const [tourStep, setTourStep] = useState<MerchantTourStep>('fill_fields');
   const [tourIntentId, setTourIntentId] = useState<string | null>(null);
   const [tourCursor, setTourCursor] = useState<{ x: number; y: number } | null>(null);
+  const [apiPayloadMode, setApiPayloadMode] = useState<'live' | 'sample'>('live');
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [copyError, setCopyError] = useState('');
+  const [origin, setOrigin] = useState('');
+  const [lastCreateIntentResponse, setLastCreateIntentResponse] = useState<CreateIntentResponse | null>(null);
   const serviceInputRef = useRef<HTMLInputElement | null>(null);
   const amountInputRef = useRef<HTMLInputElement | null>(null);
   const createButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -140,6 +145,86 @@ export default function DemoPage() {
     () => intents.filter((i) => !['expired', 'delivered'].includes(i.status)),
     [intents],
   );
+  const createIntentPath = '/api/demo/intents';
+  const createIntentUrl = origin ? `${origin}${createIntentPath}` : createIntentPath;
+  const sampleRequestBody = useMemo(() => ({
+    serviceId: 'movie tickets',
+    amount: '2',
+    settlementChain: 'fast' as SettlementChain,
+    expiryMinutes: defaults?.expiryMinutes ?? 15,
+  }), [defaults?.expiryMinutes]);
+  const liveRequestBody = useMemo(() => ({
+    serviceId: serviceId.trim() || 'movie tickets',
+    amount: amount.trim() || '2',
+    settlementChain,
+    expiryMinutes: defaults?.expiryMinutes ?? 15,
+  }), [amount, defaults?.expiryMinutes, serviceId, settlementChain]);
+  const createIntentBody = apiPayloadMode === 'live' ? liveRequestBody : sampleRequestBody;
+  const requestBodyJson = useMemo(() => JSON.stringify(createIntentBody, null, 2), [createIntentBody]);
+  function escapeForSingleQuote(value: string): string {
+    return value.replace(/'/g, '\'\"\'\"\'');
+  }
+
+  function makeCurlSnippet(url: string, body?: Record<string, unknown>): string {
+    if (!body) {
+      return `curl -X POST '${url}' \\
+  -H 'Content-Type: application/json'`;
+    }
+    const compactBody = escapeForSingleQuote(JSON.stringify(body));
+    return `curl -X POST '${url}' \\
+  -H 'Content-Type: application/json' \\
+  -d '${compactBody}'`;
+  }
+
+  function makeFetchSnippet(url: string, body?: Record<string, unknown>): string {
+    const lines = [
+      `const response = await fetch('${url}', {`,
+      `  method: 'POST',`,
+      `  headers: { 'Content-Type': 'application/json' },`,
+    ];
+    if (body) {
+      lines.push(`  body: JSON.stringify(${JSON.stringify(body, null, 2)})`);
+    }
+    lines.push('});', '', 'const data = await response.json();', 'console.log(data);');
+    return lines.join('\n');
+  }
+
+  const curlSnippet = useMemo(() => {
+    return makeCurlSnippet(createIntentUrl, createIntentBody as Record<string, unknown>);
+  }, [createIntentBody, createIntentUrl]);
+  const jsSnippet = useMemo(() => {
+    return makeFetchSnippet(createIntentUrl, createIntentBody as Record<string, unknown>);
+  }, [createIntentBody, createIntentUrl]);
+  const successResponseExample = useMemo(() => ({
+    intent: {
+      intentId: 'intent_...',
+      buyerSessionId: session?.sessionId ?? 'buyer_...',
+      serviceId: createIntentBody.serviceId,
+      requestedAmount: createIntentBody.amount,
+      tokenRequested: 'SET',
+      sourceChain: 'fast',
+      settlementChain: createIntentBody.settlementChain,
+      receiverAddress: '0x...',
+      paymentLink: `${origin || 'https://example.local'}/merchant/checkout?intentId=intent_...`,
+      paymentLinkAgent: `${origin || 'https://example.local'}/api/pay?...`,
+      expiresAt: '2026-01-01T00:15:00.000Z',
+      status: 'pending_payment',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      overpaid: false,
+      events: [],
+    },
+    session: {
+      sessionId: session?.sessionId ?? 'buyer_...',
+      addressFast: session?.addressFast ?? '0x...',
+      createdAt: session?.createdAt ?? '2026-01-01T00:00:00.000Z',
+      lastSeenAt: session?.lastSeenAt ?? '2026-01-01T00:00:00.000Z',
+    },
+  }), [createIntentBody.amount, createIntentBody.serviceId, createIntentBody.settlementChain, origin, session]);
+  const successResponseJson = useMemo(() => JSON.stringify(successResponseExample, null, 2), [successResponseExample]);
+
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
 
   useEffect(() => {
     try {
@@ -171,6 +256,19 @@ export default function DemoPage() {
       window.removeEventListener('storage', onStorage);
     };
   }, []);
+
+  async function copySnippet(field: string, value: string) {
+    setCopyError('');
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedField(field);
+      window.setTimeout(() => {
+        setCopiedField((current) => (current === field ? null : current));
+      }, 1400);
+    } catch {
+      setCopyError('Clipboard is unavailable in this browser context.');
+    }
+  }
 
   useEffect(() => {
     if (!tourActive) return;
@@ -298,6 +396,7 @@ export default function DemoPage() {
           settlementChain,
         }),
       });
+      setLastCreateIntentResponse(created);
       const appeared = await waitForIntentToAppear(created.intent.intentId);
       if (!appeared) {
         setError('Intent was created, but the list is still syncing. It should appear shortly.');
@@ -386,84 +485,195 @@ export default function DemoPage() {
 
         <section style={{ border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface)', padding: '1rem' }}>
           <h2 style={{ fontSize: '0.95rem', marginBottom: '0.75rem' }}>Merchant: Create Intent</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem' }}>
-            <label
-              style={{
-                display: 'grid',
-                gap: '0.3rem',
-                borderRadius: 8,
-                padding: tourActive && tourStep === 'fill_fields' ? '0.35rem' : 0,
-                outline: tourActive && tourStep === 'fill_fields' ? '1px solid #7dd3fc' : 'none',
-              }}
-            >
-              <span style={{ fontSize: '0.74rem', color: 'var(--text-3)' }}>Service / Product</span>
-              <input
-                ref={serviceInputRef}
-                value={serviceId}
-                onChange={(e) => setServiceId(e.target.value)}
-                placeholder="movie tickets"
-                style={{ background: 'var(--code-bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.55rem 0.65rem' }}
-              />
-            </label>
-            <label
-              style={{
-                display: 'grid',
-                gap: '0.3rem',
-                borderRadius: 8,
-                padding: tourActive && tourStep === 'fill_fields' ? '0.35rem' : 0,
-                outline: tourActive && tourStep === 'fill_fields' ? '1px solid #7dd3fc' : 'none',
-              }}
-            >
-              <span style={{ fontSize: '0.74rem', color: 'var(--text-3)' }}>Amount (SET)</span>
-              <input
-                ref={amountInputRef}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="2"
-                type="number"
-                min="0"
-                step="any"
-                style={{ background: 'var(--code-bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.55rem 0.65rem' }}
-              />
-            </label>
-            <label style={{ display: 'grid', gap: '0.3rem' }}>
-              <span style={{ fontSize: '0.74rem', color: 'var(--text-3)' }}>Settlement Chain</span>
-              <select
-                value={settlementChain}
-                onChange={(e) => setSettlementChain(e.target.value as SettlementChain)}
-                style={{ background: 'var(--code-bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.55rem 0.65rem' }}
-              >
-                <option value="fast">Fast</option>
-                <option value="arbitrum-sepolia">Arbitrum Sepolia (via OmniSet)</option>
-              </select>
-            </label>
-            <button
-              ref={createButtonRef}
-              onClick={() => void createIntent()}
-              disabled={busy || creatingIntent || !session}
-              style={{
-                background: 'var(--text)',
-                color: 'var(--bg)',
-                border: 0,
-                borderRadius: 6,
-                padding: '0.55rem 0.9rem',
-                cursor: 'pointer',
-                alignSelf: 'end',
-                outline: tourActive && tourStep === 'create_intent' ? '1px solid #7dd3fc' : 'none',
-                boxShadow: tourActive && tourStep === 'create_intent' ? '0 0 0 4px rgba(125, 211, 252, 0.25)' : 'none',
-              }}
-            >
-              {creatingIntent ? 'Creating...' : 'Create'}
-            </button>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', gap: '0.85rem', alignItems: 'start' }}>
+            <div style={{ display: 'grid', gap: '0.65rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem' }}>
+                <label
+                  style={{
+                    display: 'grid',
+                    gap: '0.3rem',
+                    borderRadius: 8,
+                    padding: tourActive && tourStep === 'fill_fields' ? '0.35rem' : 0,
+                    outline: tourActive && tourStep === 'fill_fields' ? '1px solid #7dd3fc' : 'none',
+                  }}
+                >
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-3)' }}>Service / Product</span>
+                  <input
+                    ref={serviceInputRef}
+                    value={serviceId}
+                    onChange={(e) => setServiceId(e.target.value)}
+                    placeholder="movie tickets"
+                    style={{ background: 'var(--code-bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.55rem 0.65rem' }}
+                  />
+                </label>
+                <label
+                  style={{
+                    display: 'grid',
+                    gap: '0.3rem',
+                    borderRadius: 8,
+                    padding: tourActive && tourStep === 'fill_fields' ? '0.35rem' : 0,
+                    outline: tourActive && tourStep === 'fill_fields' ? '1px solid #7dd3fc' : 'none',
+                  }}
+                >
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-3)' }}>Amount (SET)</span>
+                  <input
+                    ref={amountInputRef}
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="2"
+                    type="number"
+                    min="0"
+                    step="any"
+                    style={{ background: 'var(--code-bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.55rem 0.65rem' }}
+                  />
+                </label>
+                <label style={{ display: 'grid', gap: '0.3rem' }}>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-3)' }}>Settlement Chain</span>
+                  <select
+                    value={settlementChain}
+                    onChange={(e) => setSettlementChain(e.target.value as SettlementChain)}
+                    style={{ background: 'var(--code-bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.55rem 0.65rem' }}
+                  >
+                    <option value="fast">Fast</option>
+                    <option value="arbitrum-sepolia">Arbitrum Sepolia (via OmniSet)</option>
+                  </select>
+                </label>
+                <button
+                  ref={createButtonRef}
+                  onClick={() => void createIntent()}
+                  disabled={busy || creatingIntent || !session}
+                  style={{
+                    background: 'var(--text)',
+                    color: 'var(--bg)',
+                    border: 0,
+                    borderRadius: 6,
+                    padding: '0.55rem 0.9rem',
+                    cursor: 'pointer',
+                    alignSelf: 'end',
+                    outline: tourActive && tourStep === 'create_intent' ? '1px solid #7dd3fc' : 'none',
+                    boxShadow: tourActive && tourStep === 'create_intent' ? '0 0 0 4px rgba(125, 211, 252, 0.25)' : 'none',
+                  }}
+                >
+                  {creatingIntent ? 'Creating...' : 'Create'}
+                </button>
+              </div>
+              <p style={{ color: 'var(--text-3)', fontSize: '0.76rem' }}>
+                Expiry default: {defaults?.expiryMinutes ?? 15}m. Receiver reuse cooldown: {defaults?.receiverCooldownMinutes ?? 30}m.
+                {' '}
+                Auto-delivery: {defaults?.autoDeliveryEnabled === false ? 'off' : 'on'}
+                {defaults?.autoDeliveryEnabled && (defaults.autoDeliveryDelayMs ?? 0) > 0
+                  ? ` (${Math.floor((defaults.autoDeliveryDelayMs ?? 0) / 1000)}s delay)`
+                  : ''}.
+              </p>
+            </div>
+
+            <aside style={{ border: '1px solid var(--border)', borderRadius: 8, background: 'var(--code-bg)', padding: '0.8rem', display: 'grid', gap: '0.65rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'grid', gap: '0.2rem' }}>
+                  <h3 style={{ margin: 0, fontSize: '0.86rem' }}>Agent API: Create Intent</h3>
+                  <p style={{ margin: 0, fontSize: '0.73rem', color: 'var(--text-3)' }}>
+                    HTTP endpoint
+                  </p>
+                </div>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontFamily: 'var(--font-mono), monospace', fontSize: '0.72rem', color: 'var(--text-2)' }}>
+                  <span style={{ color: '#93c5fd' }}>POST</span>
+                  <code>{createIntentPath}</code>
+                </div>
+              </div>
+
+              <div style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 999, width: 'fit-content', padding: 2 }}>
+                <button
+                  onClick={() => setApiPayloadMode('live')}
+                  style={{
+                    border: 0,
+                    borderRadius: 999,
+                    padding: '0.28rem 0.58rem',
+                    background: apiPayloadMode === 'live' ? 'var(--text)' : 'transparent',
+                    color: apiPayloadMode === 'live' ? 'var(--bg)' : 'var(--text-2)',
+                    cursor: 'pointer',
+                    fontSize: '0.72rem',
+                  }}
+                >
+                  Live Payload
+                </button>
+                <button
+                  onClick={() => setApiPayloadMode('sample')}
+                  style={{
+                    border: 0,
+                    borderRadius: 999,
+                    padding: '0.28rem 0.58rem',
+                    background: apiPayloadMode === 'sample' ? 'var(--text)' : 'transparent',
+                    color: apiPayloadMode === 'sample' ? 'var(--bg)' : 'var(--text-2)',
+                    cursor: 'pointer',
+                    fontSize: '0.72rem',
+                  }}
+                >
+                  Static Example
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
+                <button
+                  onClick={() => void copySnippet('url', createIntentUrl)}
+                  style={{ border: '1px solid var(--border)', borderRadius: 5, padding: '0.35rem 0.6rem', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: '0.72rem' }}
+                >
+                  {copiedField === 'url' ? 'Copied URL' : 'Copy URL'}
+                </button>
+                <button
+                  onClick={() => void copySnippet('curl', curlSnippet)}
+                  style={{ border: '1px solid var(--border)', borderRadius: 5, padding: '0.35rem 0.6rem', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: '0.72rem' }}
+                >
+                  {copiedField === 'curl' ? 'Copied cURL' : 'Copy cURL'}
+                </button>
+                <button
+                  onClick={() => void copySnippet('js', jsSnippet)}
+                  style={{ border: '1px solid var(--border)', borderRadius: 5, padding: '0.35rem 0.6rem', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: '0.72rem' }}
+                >
+                  {copiedField === 'js' ? 'Copied JS' : 'Copy JS'}
+                </button>
+              </div>
+
+              {copyError && (
+                <div style={{ color: '#fca5a5', fontSize: '0.73rem' }}>
+                  {copyError}
+                </div>
+              )}
+
+              <details>
+                <summary style={{ cursor: 'pointer', fontSize: '0.75rem', color: 'var(--text-2)' }}>Request JSON</summary>
+                <pre style={{ margin: '0.5rem 0 0', fontSize: '0.72rem', lineHeight: 1.45, overflowX: 'auto' }}>{requestBodyJson}</pre>
+              </details>
+              <details>
+                <summary style={{ cursor: 'pointer', fontSize: '0.75rem', color: 'var(--text-2)' }}>Example Success Response</summary>
+                <pre style={{ margin: '0.5rem 0 0', fontSize: '0.72rem', lineHeight: 1.45, overflowX: 'auto' }}>{successResponseJson}</pre>
+              </details>
+              <details>
+                <summary style={{ cursor: 'pointer', fontSize: '0.75rem', color: 'var(--text-2)' }}>Example Failure Responses</summary>
+                <div style={{ marginTop: '0.5rem', display: 'grid', gap: '0.45rem' }}>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-3)' }}>HTTP 400</div>
+                    <pre style={{ margin: '0.25rem 0 0', fontSize: '0.72rem', lineHeight: 1.45, overflowX: 'auto' }}>{'{ "error": "Amount is required." }'}</pre>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-3)' }}>HTTP 400</div>
+                    <pre style={{ margin: '0.25rem 0 0', fontSize: '0.72rem', lineHeight: 1.45, overflowX: 'auto' }}>{'{ "error": "Settlement chain must be one of: fast, arbitrum-sepolia." }'}</pre>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-3)' }}>HTTP 404</div>
+                    <pre style={{ margin: '0.25rem 0 0', fontSize: '0.72rem', lineHeight: 1.45, overflowX: 'auto' }}>{'{ "error": "Buyer session not found. Create a session first." }'}</pre>
+                  </div>
+                </div>
+              </details>
+              {lastCreateIntentResponse && (
+                <details>
+                  <summary style={{ cursor: 'pointer', fontSize: '0.75rem', color: 'var(--text-2)' }}>Last Live Create Response</summary>
+                  <pre style={{ margin: '0.5rem 0 0', fontSize: '0.72rem', lineHeight: 1.45, overflowX: 'auto' }}>
+                    {JSON.stringify(lastCreateIntentResponse, null, 2)}
+                  </pre>
+                </details>
+              )}
+            </aside>
           </div>
-          <p style={{ color: 'var(--text-3)', fontSize: '0.76rem', marginTop: '0.65rem' }}>
-            Expiry default: {defaults?.expiryMinutes ?? 15}m. Receiver reuse cooldown: {defaults?.receiverCooldownMinutes ?? 30}m.
-            {' '}
-            Auto-delivery: {defaults?.autoDeliveryEnabled === false ? 'off' : 'on'}
-            {defaults?.autoDeliveryEnabled && (defaults.autoDeliveryDelayMs ?? 0) > 0
-              ? ` (${Math.floor((defaults.autoDeliveryDelayMs ?? 0) / 1000)}s delay)`
-              : ''}.
-          </p>
         </section>
 
         <section style={{ border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface)', padding: '1rem' }}>
@@ -479,6 +689,36 @@ export default function DemoPage() {
                 const isTourLinkTarget = tourActive
                   && tourStep === 'open_link'
                   && (tourIntentId ? intent.intentId === tourIntentId : index === 0);
+                const payIntentPath = `/api/demo/intents/${intent.intentId}/pay`;
+                const deliverIntentPath = `/api/demo/intents/${intent.intentId}/deliver`;
+                const payIntentUrl = origin ? `${origin}${payIntentPath}` : payIntentPath;
+                const deliverIntentUrl = origin ? `${origin}${deliverIntentPath}` : deliverIntentPath;
+                const payRequestBody = { amount: intent.requestedAmount };
+                const payRequestJson = JSON.stringify(payRequestBody, null, 2);
+                const paySuccessResponseJson = JSON.stringify({
+                  intent: {
+                    intentId: intent.intentId,
+                    status: intent.status === 'delivered' ? 'delivered' : 'source_paid',
+                    requestedAmount: intent.requestedAmount,
+                    settlementChain: intent.settlementChain,
+                    receiverAddress: intent.receiverAddress,
+                    sourceTxHash: '0x...',
+                    paidAmountSource: intent.requestedAmount,
+                  },
+                  session: {
+                    sessionId: session?.sessionId ?? intent.buyerSessionId,
+                    addressFast: session?.addressFast ?? '0x...',
+                  },
+                }, null, 2);
+                const deliverSuccessResponseJson = JSON.stringify({
+                  intent: {
+                    intentId: intent.intentId,
+                    status: 'delivered',
+                    settlementChain: intent.settlementChain,
+                    deliveredAt: '2026-01-01T00:05:00.000Z',
+                    settledAt: intent.settledAt ?? '2026-01-01T00:04:00.000Z',
+                  },
+                }, null, 2);
                 return (
                   <article
                     key={intent.intentId}
@@ -609,6 +849,129 @@ export default function DemoPage() {
                         Merchant Deliver Service
                       </button>
                     )}
+                    <details style={{ color: 'var(--text-2)' }}>
+                      <summary style={{ cursor: 'pointer', fontSize: '0.79rem' }}>
+                        Agent API Actions
+                      </summary>
+                      <div style={{ marginTop: '0.55rem', display: 'grid', gap: '0.6rem' }}>
+                        <div style={{ border: '1px solid var(--border)', borderRadius: 6, padding: '0.55rem', background: 'rgba(15, 23, 35, 0.35)', display: 'grid', gap: '0.45rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.45rem', flexWrap: 'wrap' }}>
+                            <strong style={{ fontSize: '0.78rem', color: 'var(--text)' }}>Pay Intent</strong>
+                            <div style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.72rem' }}>
+                              <span style={{ color: '#93c5fd' }}>POST</span>{' '}
+                              <code>{payIntentPath}</code>
+                            </div>
+                          </div>
+                          <div style={{ fontSize: '0.73rem', color: 'var(--text-3)' }}>
+                            Status transition: <code>pending_payment/source_paid</code> to <code>source_paid</code>, then verifier moves to <code>settled</code> (and eventually <code>delivered</code> if auto-delivery is enabled).
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                            <button
+                              onClick={() => void copySnippet(`pay-url-${intent.intentId}`, payIntentUrl)}
+                              style={{ border: '1px solid var(--border)', borderRadius: 5, padding: '0.3rem 0.55rem', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: '0.71rem' }}
+                            >
+                              {copiedField === `pay-url-${intent.intentId}` ? 'Copied URL' : 'Copy URL'}
+                            </button>
+                            <button
+                              onClick={() => void copySnippet(`pay-curl-${intent.intentId}`, makeCurlSnippet(payIntentUrl, payRequestBody))}
+                              style={{ border: '1px solid var(--border)', borderRadius: 5, padding: '0.3rem 0.55rem', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: '0.71rem' }}
+                            >
+                              {copiedField === `pay-curl-${intent.intentId}` ? 'Copied cURL' : 'Copy cURL'}
+                            </button>
+                            <button
+                              onClick={() => void copySnippet(`pay-js-${intent.intentId}`, makeFetchSnippet(payIntentUrl, payRequestBody))}
+                              style={{ border: '1px solid var(--border)', borderRadius: 5, padding: '0.3rem 0.55rem', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: '0.71rem' }}
+                            >
+                              {copiedField === `pay-js-${intent.intentId}` ? 'Copied JS' : 'Copy JS'}
+                            </button>
+                          </div>
+                          <details>
+                            <summary style={{ cursor: 'pointer', fontSize: '0.74rem' }}>Request JSON</summary>
+                            <pre style={{ margin: '0.45rem 0 0', fontSize: '0.7rem', lineHeight: 1.45, overflowX: 'auto' }}>{payRequestJson}</pre>
+                          </details>
+                          <details>
+                            <summary style={{ cursor: 'pointer', fontSize: '0.74rem' }}>Example Success Response</summary>
+                            <pre style={{ margin: '0.45rem 0 0', fontSize: '0.7rem', lineHeight: 1.45, overflowX: 'auto' }}>{paySuccessResponseJson}</pre>
+                          </details>
+                          <details>
+                            <summary style={{ cursor: 'pointer', fontSize: '0.74rem' }}>Common Failures</summary>
+                            <div style={{ marginTop: '0.45rem', display: 'grid', gap: '0.35rem' }}>
+                              <div>
+                                <div style={{ fontSize: '0.68rem', color: 'var(--text-3)' }}>HTTP 400</div>
+                                <pre style={{ margin: '0.2rem 0 0', fontSize: '0.7rem', lineHeight: 1.45, overflowX: 'auto' }}>{'{ "error": "Payment link expired." }'}</pre>
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '0.68rem', color: 'var(--text-3)' }}>HTTP 400</div>
+                                <pre style={{ margin: '0.2rem 0 0', fontSize: '0.7rem', lineHeight: 1.45, overflowX: 'auto' }}>{'{ "error": "Service already delivered for this intent." }'}</pre>
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '0.68rem', color: 'var(--text-3)' }}>HTTP 404</div>
+                                <pre style={{ margin: '0.2rem 0 0', fontSize: '0.7rem', lineHeight: 1.45, overflowX: 'auto' }}>{'{ "error": "Payment intent not found." }'}</pre>
+                              </div>
+                            </div>
+                          </details>
+                        </div>
+
+                        <div style={{ border: '1px solid var(--border)', borderRadius: 6, padding: '0.55rem', background: 'rgba(15, 23, 35, 0.35)', display: 'grid', gap: '0.45rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.45rem', flexWrap: 'wrap' }}>
+                            <strong style={{ fontSize: '0.78rem', color: 'var(--text)' }}>Deliver Intent</strong>
+                            <div style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.72rem' }}>
+                              <span style={{ color: '#93c5fd' }}>POST</span>{' '}
+                              <code>{deliverIntentPath}</code>
+                            </div>
+                          </div>
+                          <div style={{ fontSize: '0.73rem', color: 'var(--text-3)' }}>
+                            Status transition: <code>settled</code> to <code>delivered</code>. Endpoint fails unless settlement is complete.
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                            <button
+                              onClick={() => void copySnippet(`deliver-url-${intent.intentId}`, deliverIntentUrl)}
+                              style={{ border: '1px solid var(--border)', borderRadius: 5, padding: '0.3rem 0.55rem', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: '0.71rem' }}
+                            >
+                              {copiedField === `deliver-url-${intent.intentId}` ? 'Copied URL' : 'Copy URL'}
+                            </button>
+                            <button
+                              onClick={() => void copySnippet(`deliver-curl-${intent.intentId}`, makeCurlSnippet(deliverIntentUrl))}
+                              style={{ border: '1px solid var(--border)', borderRadius: 5, padding: '0.3rem 0.55rem', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: '0.71rem' }}
+                            >
+                              {copiedField === `deliver-curl-${intent.intentId}` ? 'Copied cURL' : 'Copy cURL'}
+                            </button>
+                            <button
+                              onClick={() => void copySnippet(`deliver-js-${intent.intentId}`, makeFetchSnippet(deliverIntentUrl))}
+                              style={{ border: '1px solid var(--border)', borderRadius: 5, padding: '0.3rem 0.55rem', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: '0.71rem' }}
+                            >
+                              {copiedField === `deliver-js-${intent.intentId}` ? 'Copied JS' : 'Copy JS'}
+                            </button>
+                          </div>
+                          <details>
+                            <summary style={{ cursor: 'pointer', fontSize: '0.74rem' }}>Request Body</summary>
+                            <pre style={{ margin: '0.45rem 0 0', fontSize: '0.7rem', lineHeight: 1.45, overflowX: 'auto' }}>{'{ }'}</pre>
+                          </details>
+                          <details>
+                            <summary style={{ cursor: 'pointer', fontSize: '0.74rem' }}>Example Success Response</summary>
+                            <pre style={{ margin: '0.45rem 0 0', fontSize: '0.7rem', lineHeight: 1.45, overflowX: 'auto' }}>{deliverSuccessResponseJson}</pre>
+                          </details>
+                          <details>
+                            <summary style={{ cursor: 'pointer', fontSize: '0.74rem' }}>Common Failures</summary>
+                            <div style={{ marginTop: '0.45rem', display: 'grid', gap: '0.35rem' }}>
+                              <div>
+                                <div style={{ fontSize: '0.68rem', color: 'var(--text-3)' }}>HTTP 400</div>
+                                <pre style={{ margin: '0.2rem 0 0', fontSize: '0.7rem', lineHeight: 1.45, overflowX: 'auto' }}>{'{ "error": "Intent must be settled before delivery." }'}</pre>
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '0.68rem', color: 'var(--text-3)' }}>HTTP 404</div>
+                                <pre style={{ margin: '0.2rem 0 0', fontSize: '0.7rem', lineHeight: 1.45, overflowX: 'auto' }}>{'{ "error": "Payment intent not found." }'}</pre>
+                              </div>
+                            </div>
+                          </details>
+                        </div>
+                        {copyError && (
+                          <div style={{ color: '#fca5a5', fontSize: '0.72rem' }}>
+                            {copyError}
+                          </div>
+                        )}
+                      </div>
+                    </details>
                   </div>
 
                   {intent.events.length > 0 && (
