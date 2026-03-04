@@ -314,6 +314,45 @@ All EVM chains share the same wallet key — same address everywhere.
 
 ---
 
+## x402 Payments (FastSet)
+
+Pay for x402-protected content on FastSet automatically. When a server returns HTTP 402 Payment Required with FastSet payment requirements, use `x402Pay()` to handle the entire flow:
+
+```js
+// Simple GET request to a paid endpoint
+const result = await money.x402Pay({ url: "https://api.example.com/premium" });
+// → { success: true, body: { ... }, payment: { amount: "0.1", network: "fastset-devnet", ... } }
+
+// POST request with body
+const result = await money.x402Pay({
+  url: "https://api.example.com/ai-query",
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ prompt: "Hello" })
+});
+```
+
+**How it works:**
+1. Makes initial request to the URL
+2. If 402 returned, parses payment requirements (amount, recipient, asset)
+3. Creates a TokenTransfer transaction on FastSet
+4. Signs and submits to get a transaction certificate
+5. Retries the request with `X-PAYMENT` header containing the certificate
+6. Returns the final response + payment details
+
+**Requirements:**
+- Fast chain must be set up: `await money.setup({ chain: "fast" })`
+- Sufficient SETUSDC balance for the payment
+- Only `fastset-devnet` network is currently supported
+
+**Result includes:**
+- `success`: Whether the paid request succeeded
+- `statusCode`: HTTP status code of the final response
+- `body`: Response body (parsed as JSON if possible)
+- `payment`: Details of the payment made (network, amount, recipient, txHash)
+
+---
+
 ## NOT for this skill
 
 Stop. Tell the user this skill cannot help with: yield farming, lending, staking, or SDK-only incoming payment detection from arbitrary external senders.
