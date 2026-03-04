@@ -207,6 +207,8 @@ curl -sX POST {{HOST}}/api/paywall/webhooks/<provider> \
   -d '{"eventId":"evt_123","intentId":"intent_abc","status":"settled"}'
 ```
 
+`intentId` and `eventId` must be present in the signed JSON body (header fallbacks are not accepted).
+
 Signature input:
 - Secret: `PAYWALL_WEBHOOK_SECRET` (or provider override `PAYWALL_WEBHOOK_SECRET_<PROVIDER>`)
 - Digest: `hex(hmac_sha256(secret, raw_request_body))`

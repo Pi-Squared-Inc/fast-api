@@ -40,20 +40,6 @@ function normalizeWebhookStatus(input: string): PaywallWebhookStatus {
   throw new PaywallError('INVALID_PARAMS', `Unsupported webhook status "${input}".`, 400);
 }
 
-function readStringMetadata(
-  metadata: Record<string, unknown> | undefined,
-  ...keys: string[]
-): string | undefined {
-  if (!metadata) return undefined;
-  for (const key of keys) {
-    const value = metadata[key];
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim();
-    }
-  }
-  return undefined;
-}
-
 function normalizeAmountRaw(
   amountRaw: string | number | undefined,
 ): string | undefined {
@@ -96,24 +82,20 @@ export async function POST(
     }
     const body = PaywallWebhookBody.parse(rawPayload);
 
-    const intentId = body.intentId?.trim()
-      || request.headers.get('x-paywall-intent-id')?.trim()
-      || readStringMetadata(body.metadata, 'intentId', 'intent_id', 'paywall_intent_id');
+    const intentId = body.intentId?.trim();
     if (!intentId) {
       throw new PaywallError(
         'INVALID_PARAMS',
-        'intentId is required in payload (or metadata.intentId / x-paywall-intent-id).',
+        'intentId is required in signed webhook payload.',
         400,
       );
     }
 
-    const eventId = body.eventId?.trim()
-      || body.id?.trim()
-      || request.headers.get('x-paywall-event-id')?.trim();
+    const eventId = body.eventId?.trim() || body.id?.trim();
     if (!eventId) {
       throw new PaywallError(
         'INVALID_PARAMS',
-        'eventId is required in payload (or id / x-paywall-event-id).',
+        'eventId is required in signed webhook payload (eventId or id).',
         400,
       );
     }

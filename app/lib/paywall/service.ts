@@ -709,6 +709,29 @@ export async function applyPaywallWebhookEvent(params: {
       };
     }
 
+    const expiresAtMs = Date.parse(intent.expires_at);
+    if (Number.isFinite(expiresAtMs) && Date.now() > expiresAtMs) {
+      intent.status = 'expired';
+      pushEvent(store.payment_events, {
+        intent_id: intent.intent_id,
+        kind: 'expired',
+        details_json: JSON.stringify({
+          source: 'webhook',
+          provider,
+          event_id: eventId,
+          status: params.status,
+          reason: 'Settlement webhook received after intent expiry.',
+          ...(occurredAt ? { occurred_at: occurredAt } : {}),
+        }),
+      });
+      return {
+        matched: true,
+        duplicate: false,
+        intent: toIntentView(intent),
+        message: `Ignored settled webhook for expired intent ${intent.intent_id}.`,
+      };
+    }
+
     const requestedRaw = BigInt(intent.requested_amount_raw);
     let paidRaw = BigInt(intent.paid_amount_raw);
     if (params.amountRaw !== undefined) {
