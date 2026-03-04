@@ -738,6 +738,9 @@ export const X402PayResult = z.object({
   payment: z.object({
     network: z.string(),
     amount: z.string(),
+    amountRaw: z.string(),
+    decimals: z.number().nullable(),
+    token: z.string(),
     recipient: z.string(),
     txHash: z.string(),
   }).optional(),
@@ -750,7 +753,7 @@ const x402PayMeta = {
     'await money.x402Pay({ url: "https://api.example.com/premium" })',
     'await money.x402Pay({ url: "https://api.example.com/data", method: "POST", body: JSON.stringify({ query: "..." }) })',
   ],
-  notes: 'Only supports FastSet network (fastset-devnet). The Fast chain must be set up first via money.setup({ chain: "fast" }). Amount is automatically determined from the 402 response.',
+  notes: 'Supports fastset-devnet/testnet and fastset-mainnet/mainnet (legacy "fast" maps to testnet). The Fast chain must be set up on the matching network first. The 402 response must include accepts[].asset. Amount formatting uses token metadata when available; otherwise amount is returned in raw units.',
 } as const;
 
 // ─── Method schema entry ─────────────────────────────────────────────────────

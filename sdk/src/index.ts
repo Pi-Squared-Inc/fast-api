@@ -36,7 +36,7 @@ import { dexscreenerProvider } from './providers/dexscreener.js';
 import { debridgeProvider } from './providers/debridge.js';
 import { fastTokenProvider } from './providers/fasttoken.js';
 import { omnisetProvider } from './providers/omniset.js';
-import { createFastTxExecutor } from './adapters/fast.js';
+import { createFastTxExecutor, rpcCall, SET_TOKEN_ID } from './adapters/fast.js';
 import { METHOD_SCHEMAS, schemaToParamString, schemaToParamDetails, schemaToResultString } from './schemas.js';
 import type {
   NetworkType,
@@ -91,6 +91,8 @@ import type {
   PaymentLinkResult,
   PaymentLinksParams,
   PaymentLinksResult,
+  X402PayParams,
+  X402PayResult,
 } from './types.js';
 
 import { parseUnits, formatUnits } from 'viem';
@@ -151,6 +153,8 @@ export type {
   PaymentLinksParams,
   PaymentLinksResult,
   PaymentLinkEntry,
+  X402PayParams,
+  X402PayResult,
 } from './types.js';
 
 export type {
@@ -272,6 +276,55 @@ function resolveSwapToken(token: string, chain: string): { address: string; deci
     chain,
     note: `Use a known symbol (USDC, USDT, WETH, WBTC, DAI) or pass a contract address directly.`,
   });
+}
+
+function resolveX402FastNetwork(network: string): NetworkType | null {
+  if (network === 'fastset-mainnet') return 'mainnet';
+  if (network === 'fastset-devnet' || network === 'fast') return 'testnet';
+  return null;
+}
+
+function tokenIdEquals(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+async function resolveFastTokenDisplay(
+  rpcUrl: string,
+  tokenId: Uint8Array,
+): Promise<{ symbol: string; decimals: number | null }> {
+  if (tokenIdEquals(tokenId, SET_TOKEN_ID)) {
+    return { symbol: 'SET', decimals: 18 };
+  }
+  try {
+    const metaResult = (await rpcCall(rpcUrl, 'proxy_getTokenInfo', {
+      token_ids: [tokenId],
+    })) as {
+      requested_token_metadata?: Array<[number[], {
+        token_name?: string;
+        decimals?: number;
+      } | null]>;
+    } | null;
+    const meta = metaResult?.requested_token_metadata?.[0]?.[1] ?? null;
+    if (meta && typeof meta.decimals === 'number') {
+      return {
+        symbol: meta.token_name ?? 'TOKEN',
+        decimals: meta.decimals,
+      };
+    }
+    if (meta?.token_name) {
+      return {
+        symbol: meta.token_name,
+        decimals: null,
+      };
+    }
+  } catch {
+    // Best effort: fall back to unknown token display below.
+  }
+  return { symbol: 'TOKEN', decimals: null };
 }
 
 
@@ -1494,19 +1547,7 @@ export const money = {
    * 3. Submitting the transaction to get a certificate
    * 4. Retrying the request with X-PAYMENT header
    */
-  async x402Pay(params: { url: string; method?: string; headers?: Record<string, string>; body?: string }): Promise<{
-    success: boolean;
-    statusCode: number;
-    headers: Record<string, string>;
-    body: unknown;
-    payment?: {
-      network: string;
-      amount: string;
-      recipient: string;
-      txHash: string;
-    };
-    note: string;
-  }> {
+  async x402Pay(params: X402PayParams): Promise<X402PayResult> {
     const { url, method = 'GET', headers: customHeaders = {}, body: requestBody } = params;
 
     // Step 1: Make initial request to get 402 response
@@ -1564,13 +1605,22 @@ export const money = {
       });
     }
 
-    // Step 3: Ensure Fast chain is set up
+    const resolvedNetwork = resolveX402FastNetwork(fastsetReq.network);
+    if (!resolvedNetwork) {
+      throw new MoneyError('UNSUPPORTED_OPERATION', `Unsupported FastSet network "${fastsetReq.network}"`, {
+        note: 'Supported FastSet networks: fastset-devnet, fastset-mainnet, fast.',
+      });
+    }
+
+    // Step 3: Ensure Fast chain is set up on matching network
     const config = await loadConfig();
-    const fastKey = configKey('fast', 'testnet');
+    const fastKey = configKey('fast', resolvedNetwork);
     const fastConfig = config.chains[fastKey];
     if (!fastConfig) {
       throw new MoneyError('CHAIN_NOT_CONFIGURED', 'Fast chain not configured', {
-        note: 'Set up Fast chain first:\n  await money.setup({ chain: "fast" })',
+        note: resolvedNetwork === 'mainnet'
+          ? 'Set up Fast mainnet first:\n  await money.setup({ chain: "fast", network: "mainnet" })'
+          : 'Set up Fast testnet first:\n  await money.setup({ chain: "fast" })',
       });
     }
 
@@ -1580,20 +1630,22 @@ export const money = {
     const { bech32m } = await import('bech32');
     const pubKeyBytes = Buffer.from(kp.publicKey, 'hex');
     const words = bech32m.toWords(pubKeyBytes);
-    const buyerAddress = bech32m.encode('fast', words, 90);
+    const buyerAddress = bech32m.encode('set', words, 90);
 
     const rpcUrl = fastConfig.rpc;
     const txExecutor = createFastTxExecutor(keyfilePath, rpcUrl, buyerAddress);
 
-    // Step 5: Determine token ID from asset (if provided)
-    let tokenId: Uint8Array;
-    if (fastsetReq.asset) {
-      // Asset is base64-encoded token ID
-      tokenId = new Uint8Array(Buffer.from(fastsetReq.asset, 'base64'));
-    } else {
-      // Default to SET token
-      tokenId = new Uint8Array(32);
-      tokenId.set([0xfa, 0x57, 0x5e, 0x70], 0);
+    // Step 5: Parse token ID from asset
+    if (!fastsetReq.asset) {
+      throw new MoneyError('INVALID_PARAMS', 'Missing asset in 402 payment requirement', {
+        note: 'The server must include "accepts[].asset" (base64-encoded 32-byte token ID).',
+      });
+    }
+    const tokenId = new Uint8Array(Buffer.from(fastsetReq.asset, 'base64'));
+    if (tokenId.length !== 32) {
+      throw new MoneyError('INVALID_PARAMS', 'Invalid asset in 402 payment requirement', {
+        note: `Expected 32-byte token ID, got ${tokenId.length} bytes.`,
+      });
     }
 
     // Step 6: Create and submit TokenTransfer transaction
@@ -1636,10 +1688,15 @@ export const money = {
       resBody = await paidRes.text();
     }
 
-    // Calculate human-readable amount
+    // Calculate human-readable amount (BigInt-safe)
     const amountRaw = BigInt(fastsetReq.maxAmountRequired);
-    const decimals = 6; // USDC decimals
-    const amountHuman = (Number(amountRaw) / Math.pow(10, decimals)).toString();
+    const tokenDisplay = await resolveFastTokenDisplay(rpcUrl, tokenId);
+    const amountHuman = tokenDisplay.decimals === null
+      ? amountRaw.toString()
+      : formatUnits(amountRaw, tokenDisplay.decimals);
+    const amountSummary = tokenDisplay.decimals === null
+      ? `${amountHuman} raw units (${tokenDisplay.symbol})`
+      : `${amountHuman} ${tokenDisplay.symbol}`;
 
     return {
       success: paidRes.ok,
@@ -1649,12 +1706,15 @@ export const money = {
       payment: {
         network: fastsetReq.network,
         amount: amountHuman,
+        amountRaw: fastsetReq.maxAmountRequired,
+        decimals: tokenDisplay.decimals,
+        token: tokenDisplay.symbol,
         recipient: fastsetReq.payTo,
         txHash,
       },
       note: paidRes.ok
-        ? `Payment of ${amountHuman} USDC successful. Content delivered.`
-        : `Payment submitted (tx: ${txHash}) but server returned ${paidRes.status}.`,
+        ? `Payment of ${amountSummary} successful. Content delivered.`
+        : `Payment submitted (tx: ${txHash}, ${amountSummary}) but server returned ${paidRes.status}.`,
     };
   },
 
