@@ -219,13 +219,14 @@ const result = await money.x402Pay({
 **Requirements:**
 - Fast chain must be set up: `await money.setup({ chain: "fast" })`
 - Sufficient SETUSDC balance for the payment
-- Only `fastset-devnet` network is currently supported
+- Supports `fastset-devnet` (Fast testnet) and `fastset-mainnet` (Fast mainnet)
+- The 402 response must include `accepts[].asset` (base64-encoded 32-byte token ID)
 
 **Result includes:**
 - `success`: Whether the paid request succeeded
 - `statusCode`: HTTP status code of the final response
 - `body`: Response body (parsed as JSON if possible)
-- `payment`: Details of the payment made (network, amount, recipient, txHash)
+- `payment`: Details of the payment made (`network`, `amount`, `amountRaw`, `decimals`, `token`, `recipient`, `txHash`)
 
 ---
 
