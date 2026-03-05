@@ -41,6 +41,7 @@ export default async function Home() {
             <a href="/sign">Signature Lab</a>
             <a href="/providers">Providers</a>
             <a href="/tokens">Tokens</a>
+            <a href="/utils">Utilities</a>
             <a href="/pay">Pay</a>
             <a href="/skill.md">Skill</a>
             <a href="/money.bundle.js" download>Bundle</a>
@@ -164,6 +165,10 @@ export default async function Home() {
                 <span className="feature-desc">Discovery and deterministic alias resolution by decimals/address</span>
               </div>
               <div className="feature">
+                <span className="feature-title">Utilities</span>
+                <span className="feature-desc">Address-family detection and unit conversion preflight tools</span>
+              </div>
+              <div className="feature">
                 <span className="feature-title">Export</span>
                 <span className="feature-desc">Export private keys for wallet backup</span>
               </div>
@@ -228,6 +233,7 @@ export default async function Home() {
             <a href="/sign">Signature Lab</a>
             <a href="/providers">Providers</a>
             <a href="/tokens">Tokens</a>
+            <a href="/utils">Utilities</a>
             <a href="/pay">Pay</a>
             <a href="/skill.md">Skill</a>
             <a href="/money.bundle.js" download>
