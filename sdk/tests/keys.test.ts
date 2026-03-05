@@ -20,14 +20,29 @@ import {
 
 let tmpDir: string;
 let tmpHomeSubDir: string; // A temp dir inside homedir for ~ expansion tests
+const KEY_ENV_NAMES = ['MONEY_FAST_PRIVATE_KEY', 'MONEY_EVM_PRIVATE_KEY', 'MONEY_SOLANA_PRIVATE_KEY'] as const;
+let originalKeyEnv: Record<string, string | undefined> = {};
 
 beforeEach(async () => {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'money-keys-test-'));
   // Create a temp dir inside homedir so we can use ~/... paths
   tmpHomeSubDir = await fs.mkdtemp(path.join(os.homedir(), '.money-keys-test-'));
+  originalKeyEnv = {};
+  for (const envName of KEY_ENV_NAMES) {
+    originalKeyEnv[envName] = process.env[envName];
+    delete process.env[envName];
+  }
 });
 
 afterEach(async () => {
+  for (const envName of KEY_ENV_NAMES) {
+    const previous = originalKeyEnv[envName];
+    if (previous === undefined) {
+      delete process.env[envName];
+    } else {
+      process.env[envName] = previous;
+    }
+  }
   await fs.rm(tmpDir, { recursive: true, force: true });
   await fs.rm(tmpHomeSubDir, { recursive: true, force: true });
 });
@@ -234,6 +249,53 @@ describe('loadKeyfile', () => {
     assert.equal(loaded.publicKey, kp.publicKey, 'publicKey should match via ~ path');
     assert.equal(loaded.privateKey, kp.privateKey, 'privateKey should match via ~ path');
   });
+
+  it('seeds missing Fast keyfile from MONEY_FAST_PRIVATE_KEY', async () => {
+    const keyfile = path.join(tmpDir, 'keys', 'fast.json');
+    process.env.MONEY_FAST_PRIVATE_KEY = `0x${'11'.repeat(32)}`;
+
+    const loaded = await loadKeyfile(keyfile);
+    assert.equal(loaded.privateKey, '11'.repeat(32), 'private key should come from env var');
+    assert.match(loaded.publicKey, /^[0-9a-f]{64}$/);
+
+    const persisted = JSON.parse(await fs.readFile(keyfile, 'utf-8')) as Record<string, unknown>;
+    assert.equal(persisted.privateKey, loaded.privateKey, 'seeded keyfile should persist env private key');
+    assert.equal(persisted.publicKey, loaded.publicKey, 'seeded keyfile should persist derived public key');
+  });
+
+  it('seeds missing EVM keyfile from MONEY_EVM_PRIVATE_KEY', async () => {
+    const keyfile = path.join(tmpDir, 'keys', 'evm.json');
+    process.env.MONEY_EVM_PRIVATE_KEY = `0x${'22'.repeat(32)}`;
+
+    const loaded = await loadKeyfile(keyfile);
+    assert.equal(loaded.privateKey, '22'.repeat(32), 'private key should be normalized without 0x');
+    assert.equal(loaded.publicKey.length, 130, 'EVM public key should be uncompressed secp256k1 (65 bytes)');
+    assert.ok(loaded.publicKey.startsWith('04'), 'EVM public key should start with 04');
+  });
+
+  it('throws a clear error when env private key is invalid', async () => {
+    const keyfile = path.join(tmpDir, 'keys', 'fast.json');
+    process.env.MONEY_FAST_PRIVATE_KEY = 'invalid-key';
+
+    await assert.rejects(
+      () => loadKeyfile(keyfile),
+      (err: Error) => {
+        assert.ok(err.message.includes('Invalid private key in MONEY_FAST_PRIVATE_KEY'));
+        return true;
+      },
+    );
+  });
+
+  it('does not replace an existing keyfile even when env key is set', async () => {
+    const keyfile = path.join(tmpDir, 'keys', 'fast.json');
+    const original = await generateEd25519Key();
+    await saveKeyfile(keyfile, original);
+    process.env.MONEY_FAST_PRIVATE_KEY = `0x${'33'.repeat(32)}`;
+
+    const loaded = await loadKeyfile(keyfile);
+    assert.equal(loaded.privateKey, original.privateKey, 'existing keyfile should take precedence');
+    assert.equal(loaded.publicKey, original.publicKey, 'existing public key should be preserved');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -366,5 +428,4 @@ describe('withKey', () => {
     );
   });
 });
-
 

@@ -1,5 +1,6 @@
 import { money, MoneyError } from '../../../../dist/src/index.js';
 import { ensureMoneyConfigDir } from '../../../lib/ensure-money-config-dir';
+import { applyServerWalletEnv } from '../../../lib/server-wallet-env';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -57,8 +58,12 @@ export async function POST(request: Request) {
     return badRequest('Amount must be a positive number.');
   }
 
+  const walletEnv = applyServerWalletEnv(chain, network);
+  let senderAddress: string | null = null;
+
   try {
     const setup = await money.setup({ chain, network });
+    senderAddress = setup.address;
     const result = await money.send({
       to,
       amount,
@@ -93,6 +98,8 @@ export async function POST(request: Request) {
           error: error.message,
           code: error.code,
           note: error.note ?? null,
+          senderAddress,
+          walletEnvSource: walletEnv.source,
         },
         { status },
       );
@@ -103,6 +110,8 @@ export async function POST(request: Request) {
       {
         error: message,
         code: 'UNKNOWN_ERROR',
+        senderAddress,
+        walletEnvSource: walletEnv.source,
       },
       { status: 500 },
     );

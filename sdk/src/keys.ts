@@ -20,6 +20,74 @@ ed.etc.sha512Sync = (...msgs: Uint8Array[]) => sha512(
   msgs.length === 1 ? msgs[0] : new Uint8Array(msgs.reduce((a, m) => { const r = new Uint8Array(a.length + m.length); r.set(a); r.set(m, a.length); return r; }, new Uint8Array(0)))
 );
 
+// ─── Env-backed deterministic key seeding ────────────────────────────────────
+
+type KeyKind = 'ed25519' | 'secp256k1';
+
+const PRIVATE_KEY_HEX_PATTERN = /^[0-9a-f]{64}$/;
+
+function normalizeEnvPrivateKey(value: string, envName: string): string {
+  const trimmed = value.trim();
+  const clean = trimmed.startsWith('0x') || trimmed.startsWith('0X')
+    ? trimmed.slice(2)
+    : trimmed;
+  const lower = clean.toLowerCase();
+  if (!PRIVATE_KEY_HEX_PATTERN.test(lower)) {
+    throw new Error(`Invalid private key in ${envName}: expected 32-byte hex (64 chars, optional 0x prefix).`);
+  }
+  return lower;
+}
+
+function getEnvSeedSpec(resolvedPath: string): { envName: string; kind: KeyKind } | null {
+  const file = basename(resolvedPath).toLowerCase();
+  if (file.includes('fast') || file.includes('ed25519')) {
+    return { envName: 'MONEY_FAST_PRIVATE_KEY', kind: 'ed25519' };
+  }
+  if (file.includes('solana')) {
+    return { envName: 'MONEY_SOLANA_PRIVATE_KEY', kind: 'ed25519' };
+  }
+  if (file.includes('evm') || file.includes('secp256k1')) {
+    return { envName: 'MONEY_EVM_PRIVATE_KEY', kind: 'secp256k1' };
+  }
+  return null;
+}
+
+async function keypairFromPrivateKey(
+  privateKeyHex: string,
+  kind: KeyKind,
+): Promise<{ publicKey: string; privateKey: string }> {
+  if (kind === 'ed25519') {
+    const pubKey = await ed.getPublicKeyAsync(Buffer.from(privateKeyHex, 'hex'));
+    return {
+      publicKey: Buffer.from(pubKey).toString('hex'),
+      privateKey: privateKeyHex,
+    };
+  }
+  const pubKey = secp.getPublicKey(Buffer.from(privateKeyHex, 'hex'), false);
+  return {
+    publicKey: Buffer.from(pubKey).toString('hex'),
+    privateKey: privateKeyHex,
+  };
+}
+
+async function seedKeyfileFromEnvIfConfigured(resolvedPath: string): Promise<boolean> {
+  const spec = getEnvSeedSpec(resolvedPath);
+  if (!spec) return false;
+  const raw = process.env[spec.envName];
+  if (!raw || !raw.trim()) return false;
+
+  const privateKey = normalizeEnvPrivateKey(raw, spec.envName);
+  const keypair = await keypairFromPrivateKey(privateKey, spec.kind);
+  try {
+    await saveKeyfile(resolvedPath, keypair);
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') {
+      throw err;
+    }
+  }
+  return true;
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
@@ -67,8 +135,19 @@ export async function loadKeyfile(
   try {
     raw = await readFile(resolved, 'utf-8');
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`Failed to read keyfile at ${resolved}: ${msg}`);
+    const errno = err as NodeJS.ErrnoException;
+    if (errno.code === 'ENOENT') {
+      const seeded = await seedKeyfileFromEnvIfConfigured(resolved);
+      if (seeded) {
+        raw = await readFile(resolved, 'utf-8');
+      } else {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new Error(`Failed to read keyfile at ${resolved}: ${msg}`);
+      }
+    } else {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`Failed to read keyfile at ${resolved}: ${msg}`);
+    }
   }
   const parsed = JSON.parse(raw) as Record<string, unknown>;
   if (typeof parsed.publicKey !== 'string' || typeof parsed.privateKey !== 'string') {
