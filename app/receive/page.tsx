@@ -3,12 +3,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AgentFlowPanel } from '../components/agent-flow/agent-flow-panel';
 import type { ApiActionCardProps } from '../components/agent-flow/api-action-card';
+import { normalizeLocalOrigin } from '../lib/origin';
 import { CHAINS, isValidAddress } from '../lib/pay-chains';
 
 type NetworkType = 'testnet' | 'mainnet';
 
 function firstLines(value: string, limit = 26): string {
   return value.split('\n').slice(0, limit).join('\n');
+}
+
+function defaultTokenForReceive(chain: { value: string; token: string }): string {
+  return chain.value === 'fast' ? 'SETUSDC' : chain.token;
 }
 
 export default function ReceivePage() {
@@ -19,7 +24,7 @@ export default function ReceivePage() {
   const [network, setNetwork] = useState<NetworkType>('testnet');
   const [receiver, setReceiver] = useState('');
   const [amount, setAmount] = useState('1');
-  const [token, setToken] = useState(defaultChain.token);
+  const [token, setToken] = useState(defaultTokenForReceive(defaultChain));
   const [memo, setMemo] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
   const [error, setError] = useState('');
@@ -33,11 +38,11 @@ export default function ReceivePage() {
   );
 
   useEffect(() => {
-    setOrigin(window.location.origin);
+    setOrigin(normalizeLocalOrigin(window.location.origin));
   }, []);
 
   useEffect(() => {
-    setToken(selectedChain.token);
+    setToken(defaultTokenForReceive(selectedChain));
   }, [selectedChain]);
 
   function buildPayUrl(): string | null {
@@ -65,11 +70,12 @@ export default function ReceivePage() {
       amount: amount.trim(),
       chain,
       network,
-      token: token.trim() || selectedChain.token,
+      token: token.trim() || defaultTokenForReceive(selectedChain),
     });
     if (memo.trim()) params.set('memo', memo.trim());
 
-    return `${window.location.origin}/api/pay?${params.toString()}`;
+    const currentOrigin = normalizeLocalOrigin(window.location.origin);
+    return `${currentOrigin}/api/pay?${params.toString()}`;
   }
 
   function generateLink() {
@@ -121,11 +127,11 @@ export default function ReceivePage() {
       amount: amount.trim() || '1',
       chain,
       network,
-      token: token.trim() || selectedChain.token,
+      token: token.trim() || defaultTokenForReceive(selectedChain),
     });
     if (memo.trim()) params.set('memo', memo.trim());
     return params.toString();
-  }, [amount, chain, memo, network, receiver, selectedChain.sampleReceiver, selectedChain.token, token]);
+  }, [amount, chain, memo, network, receiver, selectedChain, token]);
 
   const agentActions = useMemo<ApiActionCardProps[]>(() => {
     const payUrl = `${origin || ''}/api/pay?${payQuery}`;
@@ -240,7 +246,7 @@ export default function ReceivePage() {
                 <input
                   value={token}
                   onChange={(event) => setToken(event.target.value)}
-                  placeholder={selectedChain.token}
+                  placeholder={defaultTokenForReceive(selectedChain)}
                   style={{ background: 'var(--code-bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.45rem 0.6rem' }}
                 />
               </label>
@@ -290,8 +296,19 @@ export default function ReceivePage() {
 
             {linkUrl && (
               <div style={{ display: 'grid', gap: '0.35rem', fontSize: '0.74rem', color: 'var(--text-2)' }}>
-                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <code style={{ overflowX: 'auto', maxWidth: '100%' }}>{linkUrl}</code>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center', minWidth: 0 }}>
+                  <code
+                    style={{
+                      maxWidth: '100%',
+                      minWidth: 0,
+                      flex: '1 1 100%',
+                      whiteSpace: 'normal',
+                      overflowWrap: 'anywhere',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {linkUrl}
+                  </code>
                   <button
                     onClick={() => void copyLinkUrl()}
                     style={{ border: '1px solid var(--border)', borderRadius: 6, padding: '0.22rem 0.45rem', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: '0.7rem' }}

@@ -4,7 +4,7 @@
  * Uses BCS (Binary Canonical Serialization) for transaction encoding,
  * Ed25519 signing with "Transaction::" prefix, and the proxy JSON-RPC API.
  *
- * Addresses are bech32m-encoded (`set1...`) for user display, but raw
+ * Addresses are bech32m-encoded (`fast1...`) for user display, but raw
  * 32-byte public keys for RPC calls.
  */
 
@@ -30,11 +30,16 @@ import type { FastTxExecutor, FastTransferResult } from '../providers/types.js';
 
 export const FAST_DECIMALS = 18;
 const DEFAULT_TOKEN = 'SET';
-const ADDRESS_PATTERN = /^set1[a-z0-9]{38,}$/;
+const ADDRESS_PATTERN = /^(set|fast)1[a-z0-9]{38,}$/;
 const EXPLORER_BASE = 'https://explorer.fastset.xyz/txs';
 /** Native SET token ID: [0xfa, 0x57, 0x5e, 0x70, 0, 0, ..., 0] */
 export const SET_TOKEN_ID = new Uint8Array(32);
 SET_TOKEN_ID.set([0xfa, 0x57, 0x5e, 0x70], 0);
+
+function isNativeFastTokenSymbol(token: string): boolean {
+  const upper = token.toUpperCase();
+  return upper === 'SET' || upper === 'FAST';
+}
 
 // ---------------------------------------------------------------------------
 // BCS Type Definitions — must match on-chain types exactly
@@ -166,7 +171,7 @@ function hexToTokenId(hex: string): Uint8Array {
 function pubkeyToAddress(publicKeyHex: string): string {
   const pubBytes = Buffer.from(publicKeyHex, 'hex');
   const words = bech32m.toWords(pubBytes);
-  return bech32m.encode('set', words, 90);
+  return bech32m.encode('fast', words, 90);
 }
 
 export function addressToPubkey(address: string): Uint8Array {
@@ -286,11 +291,11 @@ export function createFastAdapter(rpcUrl: string, network: string = 'testnet'): 
 
       if (!result) return { amount: '0', token: tok };
 
-      // Native SET balance
-      if (tok === 'SET') {
+      // Native Fast token balance (supports SET and FAST aliases)
+      if (isNativeFastTokenSymbol(tok)) {
         const hexBalance = result.balance ?? '0';
         const amount = fromHex(hexBalance, FAST_DECIMALS);
-        return { amount, token: tok };
+        return { amount, token: tok.toUpperCase() };
       }
 
       // Non-native token: search token_balance array by hex token ID
@@ -402,7 +407,7 @@ export function createFastAdapter(rpcUrl: string, network: string = 'testnet'): 
         // Derive bech32m address from public key
         const pubkeyBytes = Buffer.from(kp.publicKey, 'hex');
         const words = bech32m.toWords(pubkeyBytes);
-        const address = bech32m.encode('set', words);
+        const address = bech32m.encode('fast', words);
 
         // Convert message to bytes
         const msgBytes = typeof params.message === 'string'
@@ -420,7 +425,7 @@ export function createFastAdapter(rpcUrl: string, network: string = 'testnet'): 
     },
 
     // -----------------------------------------------------------------------
-    // verifySign: verify an Ed25519 signature against a set1... address
+    // verifySign: verify an Ed25519 signature against a Fast bech32m address
     // -----------------------------------------------------------------------
     async verifySign(params: {
       message: string | Uint8Array;

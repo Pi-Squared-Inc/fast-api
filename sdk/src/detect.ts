@@ -11,7 +11,7 @@ import { loadConfig } from './config.js';
 // ─── Patterns ─────────────────────────────────────────────────────────────────
 
 const PATTERNS: Record<string, RegExp> = {
-  fast:   /^set1[a-z0-9]{38,}$/,           // bech32m
+  fast:   /^(set|fast)1[a-z0-9]{38,}$/,    // bech32m
   evm:    /^0x[0-9a-fA-F]{40}$/,           // hex, 20 bytes
   solana: /^[1-9A-HJ-NP-Za-km-z]{32,44}$/, // base58
 };

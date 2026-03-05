@@ -12,6 +12,7 @@ import {
   getChainConfig,
   setChainConfig,
 } from '../src/config.js';
+import { resolveHomeDir } from '../src/utils.js';
 import type { ChainConfig, MoneyConfig } from '../src/types.js';
 
 // ---------------------------------------------------------------------------
@@ -67,13 +68,13 @@ describe('getConfigDir', () => {
 
   it('expands ~ in MONEY_CONFIG_DIR', () => {
     process.env.MONEY_CONFIG_DIR = '~/testmoney';
-    const expected = path.join(os.homedir(), 'testmoney');
+    const expected = path.join(resolveHomeDir(), 'testmoney');
     assert.equal(getConfigDir(), expected);
   });
 
   it('returns ~/.money when MONEY_CONFIG_DIR is not set', () => {
     delete process.env.MONEY_CONFIG_DIR;
-    const expected = path.join(os.homedir(), '.money');
+    const expected = path.join(resolveHomeDir(), '.money');
     assert.equal(getConfigDir(), expected);
   });
 });

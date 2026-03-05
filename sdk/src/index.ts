@@ -246,7 +246,7 @@ async function getAddressForChain(chainConfig: ChainConfig): Promise<string> {
     const { bech32m } = await import('bech32');
     const pubKeyBytes = Buffer.from(kp.publicKey, 'hex');
     const words = bech32m.toWords(pubKeyBytes);
-    return bech32m.encode('set', words);
+    return bech32m.encode('fast', words);
   }
 }
 
@@ -551,7 +551,7 @@ export const money = {
   async send(params: SendParams): Promise<SendResult> {
     const { to, amount: amountRaw, chain, network, token: tokenOpt, payment_id } = params;
 
-    requireParam(to, 'to', 'Provide a recipient address:\n  await money.send({ to: "set1...", amount: "1", chain: "fast" })');
+    requireParam(to, 'to', 'Provide a recipient address:\n  await money.send({ to: "fast1...", amount: "1", chain: "fast" })');
     requireParam(chain, 'chain', 'Provide a chain name:\n  await money.send({ to, amount, chain: "fast" })');
     if (!amountRaw) {
       throw new MoneyError('INVALID_PARAMS', 'Missing required param: amount', {
@@ -784,7 +784,7 @@ export const money = {
     if (chains.length > 1) {
       note = 'Multiple chains use this address format. Specify chain explicitly.';
     } else if (chains.length === 0) {
-      note = 'Address format not recognized. Supported formats:\n  Fast: set1... (bech32m)\n  EVM: 0x... (40 hex chars)\n  Solana: base58 (32-44 chars)';
+      note = 'Address format not recognized. Supported formats:\n  Fast: fast1... or set1... (bech32m)\n  EVM: 0x... (40 hex chars)\n  Solana: base58 (32-44 chars)';
     } else {
       note = '';
     }
@@ -1375,19 +1375,19 @@ export const money = {
   async createPaymentLink(params: PaymentLinkParams): Promise<PaymentLinkResult> {
     if (!params.chain) {
       throw new MoneyError('INVALID_PARAMS', 'Missing required param: chain', {
-        note: 'Provide a chain name:\n  await money.createPaymentLink({ receiver: "set1...", amount: 10, chain: "fast" })',
+        note: 'Provide a chain name:\n  await money.createPaymentLink({ receiver: "fast1...", amount: 10, chain: "fast" })',
       });
     }
     if (!params.receiver) {
       throw new MoneyError('INVALID_PARAMS', 'Missing required param: receiver', {
-        note: 'Provide the recipient address:\n  await money.createPaymentLink({ receiver: "set1...", amount: 10, chain: "fast" })',
+        note: 'Provide the recipient address:\n  await money.createPaymentLink({ receiver: "fast1...", amount: 10, chain: "fast" })',
       });
     }
 
     const amountNum = typeof params.amount === 'string' ? parseFloat(params.amount) : params.amount;
     if (!amountNum || amountNum <= 0 || isNaN(amountNum)) {
       throw new MoneyError('INVALID_PARAMS', 'Amount must be a positive number', {
-        note: 'Provide a positive amount:\n  await money.createPaymentLink({ receiver: "set1...", amount: 10, chain: "fast" })',
+        note: 'Provide a positive amount:\n  await money.createPaymentLink({ receiver: "fast1...", amount: 10, chain: "fast" })',
       });
     }
     const amountStr = String(amountNum);
@@ -1558,6 +1558,7 @@ export const money = {
 
 /** Known native token decimals */
 const NATIVE_DECIMALS: Record<string, number> = {
+  FAST: 18,
   SET: 18,
   ETH: 18,
   SOL: 9,
@@ -1588,9 +1589,14 @@ async function resolveDecimals(opts: {
 
   const { key, chainConfig } = await requireChainConfig(opts.chain, opts.network);
   const tokenName = opts.token ?? chainConfig.defaultToken;
+  const tokenUpper = tokenName.toUpperCase();
+
+  if (opts.chain === 'fast' && (tokenUpper === 'SET' || tokenUpper === 'FAST')) {
+    return 18;
+  }
 
   // Check native token defaults first
-  const nativeDec = NATIVE_DECIMALS[tokenName];
+  const nativeDec = NATIVE_DECIMALS[tokenUpper];
   if (tokenName === chainConfig.defaultToken && nativeDec !== undefined) {
     return nativeDec;
   }

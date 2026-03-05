@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { MoneyError } from '../../../dist/src/errors.js';
 import { money } from '../../../dist/src/index.js';
 import type { PaymentLinkEntry, PaymentLinkParams, PaymentLinksParams } from '../../../dist/src/types.js';
+import { ensureMoneyConfigDir } from '../../lib/ensure-money-config-dir';
+import { normalizeLocalOrigin } from '../../lib/origin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,7 +21,7 @@ const Direction = z.enum(['created', 'paid']);
 
 function baseOrigin(request: Request): string {
   const url = new URL(request.url);
-  return `${url.protocol}//${url.host}`;
+  return normalizeLocalOrigin(`${url.protocol}//${url.host}`);
 }
 
 function toApiPayUrl(rawUrl: string, origin: string): string {
@@ -94,6 +96,8 @@ function toOptionalString(value: string | null): string | undefined {
 
 export async function POST(request: Request) {
   try {
+    await ensureMoneyConfigDir();
+
     const json = (await request.json().catch(() => ({}))) as unknown;
     const body = CreatePaymentLinkBody.parse(json);
     const params: PaymentLinkParams = {
@@ -120,6 +124,8 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
+    await ensureMoneyConfigDir();
+
     const url = new URL(request.url);
     const rawDirection = toOptionalString(url.searchParams.get('direction'));
     const rawLimit = toOptionalString(url.searchParams.get('limit'));

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AgentFlowPanel } from '../components/agent-flow/agent-flow-panel';
 import type { ApiActionCardProps } from '../components/agent-flow/api-action-card';
+import { normalizeLocalOrigin } from '../lib/origin';
 
 type NetworkType = 'testnet' | 'mainnet';
 type SwapUiState = 'idle' | 'quoting' | 'quoted' | 'swapping' | 'success' | 'error';
@@ -173,7 +174,7 @@ export default function SwapQuoteTerminalPage() {
   );
 
   useEffect(() => {
-    setOrigin(window.location.origin);
+    setOrigin(normalizeLocalOrigin(window.location.origin));
   }, []);
 
   useEffect(() => {

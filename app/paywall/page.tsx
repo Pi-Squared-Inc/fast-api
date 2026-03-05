@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AgentFlowPanel } from '../components/agent-flow/agent-flow-panel';
 import type { ApiActionCardProps } from '../components/agent-flow/api-action-card';
+import { normalizeLocalOrigin } from '../lib/origin';
 
 type PaywallProduct = {
   productId: string;
@@ -252,7 +253,7 @@ export default function PaywallStudioPage() {
   const selectedIntent = selectedIntentRuntime?.intent ?? null;
 
   useEffect(() => {
-    setOrigin(window.location.origin);
+    setOrigin(normalizeLocalOrigin(window.location.origin));
   }, []);
 
   function pushTimeline(entry: TimelineEntry) {

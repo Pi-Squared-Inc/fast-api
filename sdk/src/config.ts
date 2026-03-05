@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import type { MoneyConfig, ChainConfig, CustomChainDef } from './types.js';
+import { resolveHomeDir } from './utils.js';
 
 /**
  * Returns the expanded path to the config directory (~/.money/ by default).
@@ -11,10 +11,10 @@ export function getConfigDir(): string {
   const override = process.env.MONEY_CONFIG_DIR;
   if (override) {
     return override.startsWith('~')
-      ? path.join(os.homedir(), override.slice(1))
+      ? path.join(resolveHomeDir(), override.slice(1))
       : override;
   }
-  return path.join(os.homedir(), '.money');
+  return path.join(resolveHomeDir(), '.money');
 }
 
 /**

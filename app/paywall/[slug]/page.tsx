@@ -2,6 +2,7 @@
 
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { normalizeLocalOrigin } from '../../lib/origin';
 
 type PaywallProduct = {
   productId: string;
@@ -107,7 +108,7 @@ function timeUntil(iso: string | undefined): string {
 }
 
 function buildPaymentRequestUrl(intent: PaywallIntent): string {
-  const url = new URL('/api/pay', window.location.origin);
+  const url = new URL('/api/pay', normalizeLocalOrigin(window.location.origin));
   url.searchParams.set('receiver', intent.receiverAddress);
   url.searchParams.set('amount', intent.requestedAmount);
   url.searchParams.set('chain', intent.chain);

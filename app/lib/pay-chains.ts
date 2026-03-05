@@ -10,9 +10,9 @@ export const CHAINS: ChainOption[] = [
   {
     name: 'Fast',
     value: 'fast',
-    token: 'SET',
-    placeholder: 'set1...',
-    sampleReceiver: 'set1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq',
+    token: 'FAST',
+    placeholder: 'fast1...',
+    sampleReceiver: 'fast1rv8wsdd5pnkwt4u637g2yj4tpuyq26rzw8380rfhpnsnljz7v3tqv4njuq',
   },
   {
     name: 'Base',
@@ -101,7 +101,7 @@ export const CHAINS: ChainOption[] = [
 ];
 
 export const ADDRESS_PATTERNS: Record<string, RegExp> = {
-  fast: /^set1[a-z0-9]{38,}$/,
+  fast: /^(set|fast)1[a-z0-9]{38,}$/,
   base: /^0x[0-9a-fA-F]{40}$/,
   ethereum: /^0x[0-9a-fA-F]{40}$/,
   arbitrum: /^0x[0-9a-fA-F]{40}$/,

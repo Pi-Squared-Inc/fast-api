@@ -1,8 +1,8 @@
 import type { PaymentLinkProviderAdapter } from './types';
 import type { SettlementChain } from '../types';
 
-function settlementToken(chain: SettlementChain): 'SET' | 'WSET' {
-  return chain === 'fast' ? 'SET' : 'WSET';
+function settlementToken(chain: SettlementChain): 'FAST' | 'WSET' {
+  return chain === 'fast' ? 'FAST' : 'WSET';
 }
 
 function settlementNetwork(_chain: SettlementChain): 'testnet' {
@@ -34,7 +34,7 @@ export const nativePaymentLinkProvider: PaymentLinkProviderAdapter = {
   id: 'native',
   mode: 'hosted-checkout',
   async createLink(input) {
-    const url = new URL('/merchant/checkout', input.baseUrl);
+    const url = new URL('/merchant-dashboard/checkout', input.baseUrl);
     url.searchParams.set('intentId', input.intentId);
     return { url: url.toString() };
   },

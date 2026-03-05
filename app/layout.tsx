@@ -72,7 +72,7 @@ export default function RootLayout({
             </a>
             <div className="nav-actions">
               <div className="nav-links">
-                <a href="/merchant">Docs</a>
+                <a href="/send">Docs</a>
                 <a href="/waitlist">Waitlist</a>
               </div>
               <ThemeToggle />

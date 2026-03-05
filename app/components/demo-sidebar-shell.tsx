@@ -7,8 +7,8 @@ import { usePathname } from 'next/navigation';
 const DEMO_LINKS = [
   { href: '/send', label: 'Send' },
   { href: '/receive', label: 'Receive' },
-  { href: '/payment-links', label: 'Invoice Links' },
-  { href: '/merchant', label: 'Merchant Dashboard' },
+  { href: '/invoice-links', label: 'Invoice Links' },
+  { href: '/merchant-dashboard', label: 'Merchant Dashboard' },
   { href: '/paywall', label: 'Content Paywall' },
 ];
 
@@ -29,8 +29,10 @@ const SIDEBAR_ROUTE_PREFIXES = [
   '/send',
   '/receive',
   '/pay',
+  '/merchant-dashboard',
   '/merchant',
   '/paywall',
+  '/invoice-links',
   '/payment-links',
   '/swap',
   '/bridge',
