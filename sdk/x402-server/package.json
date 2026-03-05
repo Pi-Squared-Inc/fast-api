@@ -1,0 +1,22 @@
+{
+  "name": "@pi2labs/x402-server",
+  "version": "0.1.0",
+  "description": "x402 payment middleware for FastSet — gate any API behind micropayments",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
