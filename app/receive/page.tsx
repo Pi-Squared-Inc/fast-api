@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AgentFlowPanel } from '../components/agent-flow/agent-flow-panel';
 import type { ApiActionCardProps } from '../components/agent-flow/api-action-card';
+import { normalizeLocalOrigin } from '../lib/origin';
 import { CHAINS, isValidAddress } from '../lib/pay-chains';
 
 type NetworkType = 'testnet' | 'mainnet';
@@ -33,7 +34,7 @@ export default function ReceivePage() {
   );
 
   useEffect(() => {
-    setOrigin(window.location.origin);
+    setOrigin(normalizeLocalOrigin(window.location.origin));
   }, []);
 
   useEffect(() => {
@@ -69,7 +70,8 @@ export default function ReceivePage() {
     });
     if (memo.trim()) params.set('memo', memo.trim());
 
-    return `${window.location.origin}/api/pay?${params.toString()}`;
+    const currentOrigin = normalizeLocalOrigin(window.location.origin);
+    return `${currentOrigin}/api/pay?${params.toString()}`;
   }
 
   function generateLink() {
@@ -290,8 +292,19 @@ export default function ReceivePage() {
 
             {linkUrl && (
               <div style={{ display: 'grid', gap: '0.35rem', fontSize: '0.74rem', color: 'var(--text-2)' }}>
-                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <code style={{ overflowX: 'auto', maxWidth: '100%' }}>{linkUrl}</code>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center', minWidth: 0 }}>
+                  <code
+                    style={{
+                      maxWidth: '100%',
+                      minWidth: 0,
+                      flex: '1 1 100%',
+                      whiteSpace: 'normal',
+                      overflowWrap: 'anywhere',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {linkUrl}
+                  </code>
                   <button
                     onClick={() => void copyLinkUrl()}
                     style={{ border: '1px solid var(--border)', borderRadius: 6, padding: '0.22rem 0.45rem', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: '0.7rem' }}

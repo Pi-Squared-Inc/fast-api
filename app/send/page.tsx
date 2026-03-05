@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AgentFlowPanel } from '../components/agent-flow/agent-flow-panel';
 import type { ApiActionCardProps } from '../components/agent-flow/api-action-card';
+import { normalizeLocalOrigin } from '../lib/origin';
 import { CHAINS, isValidAddress } from '../lib/pay-chains';
 
 type NetworkType = 'testnet' | 'mainnet';
@@ -76,7 +77,7 @@ export default function SendPage() {
   );
 
   useEffect(() => {
-    setOrigin(window.location.origin);
+    setOrigin(normalizeLocalOrigin(window.location.origin));
   }, []);
 
   useEffect(() => {

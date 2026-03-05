@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
 import { randomBytes } from 'node:crypto';
+import { originFromHost } from '../../lib/origin';
 
 export const dynamic = 'force-dynamic';
 
@@ -196,8 +197,7 @@ export async function GET(request: Request) {
   // Derive base URL from request headers
   const headersList = await headers();
   const host = headersList.get('host') || 'localhost:3000';
-  const protocol = host.includes('localhost') ? 'http' : 'https';
-  const baseUrl = protocol + '://' + host;
+  const baseUrl = originFromHost(host);
 
   const markdown = buildMarkdown({
     paymentId,

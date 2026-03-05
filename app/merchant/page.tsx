@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AgentFlowPanel } from '../components/agent-flow/agent-flow-panel';
 import type { ApiActionCardProps } from '../components/agent-flow/api-action-card';
 import { PRODUCT_TOUR_QUERY_PARAM, PRODUCT_TOUR_STORAGE_KEY } from '../lib/demo/tour';
+import { normalizeLocalOrigin } from '../lib/origin';
 
 type BuyerSession = {
   sessionId: string;
@@ -331,7 +332,7 @@ export default function DemoPage() {
   ]);
 
   useEffect(() => {
-    setOrigin(window.location.origin);
+    setOrigin(normalizeLocalOrigin(window.location.origin));
   }, []);
 
   useEffect(() => {
@@ -744,7 +745,7 @@ export default function DemoPage() {
                         onClick={(event) => {
                           if (!isTourLinkTarget || !tourActive || tourStep !== 'open_link') return;
                           event.preventDefault();
-                          const checkoutUrl = new URL(intent.paymentLink, window.location.origin);
+                          const checkoutUrl = new URL(intent.paymentLink, normalizeLocalOrigin(window.location.origin));
                           checkoutUrl.searchParams.set(PRODUCT_TOUR_QUERY_PARAM, '1');
                           window.open(checkoutUrl.toString(), '_blank', 'noopener,noreferrer');
                         }}

@@ -10,6 +10,7 @@ import {
   createPaywallIntent,
   PAYWALL_BUYER_COOKIE,
 } from '../../../lib/paywall/service';
+import { normalizeLocalOrigin } from '../../../lib/origin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
     const cookieBuyerId = cookieStore.get(PAYWALL_BUYER_COOKIE)?.value;
     const buyerId = body.buyerId?.trim() || cookieBuyerId || await createPaywallBuyerId();
 
-    const baseUrl = new URL(request.url).origin;
+    const baseUrl = normalizeLocalOrigin(new URL(request.url).origin);
     const created = await createPaywallIntent({
       productSlug: body.productSlug,
       buyerId,

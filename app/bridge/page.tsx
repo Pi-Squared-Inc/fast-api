@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AgentFlowPanel } from '../components/agent-flow/agent-flow-panel';
 import type { ApiActionCardProps } from '../components/agent-flow/api-action-card';
+import { normalizeLocalOrigin } from '../lib/origin';
 
 type NetworkType = 'testnet' | 'mainnet';
 type BridgeUiState = 'idle' | 'validating' | 'ready' | 'bridging' | 'success' | 'error';
@@ -163,7 +164,7 @@ export default function BridgeConsolePage() {
   );
 
   useEffect(() => {
-    setOrigin(window.location.origin);
+    setOrigin(normalizeLocalOrigin(window.location.origin));
   }, []);
 
   function pushTimeline(kind: string, detail: string) {

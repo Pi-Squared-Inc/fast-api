@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AgentFlowPanel } from '../components/agent-flow/agent-flow-panel';
 import type { ApiActionCardProps } from '../components/agent-flow/api-action-card';
+import { normalizeLocalOrigin } from '../lib/origin';
 
 type NetworkType = 'testnet' | 'mainnet';
 type LinkDirection = 'created' | 'paid';
@@ -147,7 +148,7 @@ export default function PaymentLinksDashboardPage() {
   );
 
   useEffect(() => {
-    setOrigin(window.location.origin);
+    setOrigin(normalizeLocalOrigin(window.location.origin));
   }, []);
 
   useEffect(() => {
@@ -539,11 +540,53 @@ export default function PaymentLinksDashboardPage() {
               {latestCreated ? (
                 <div style={{ display: 'grid', gap: '0.4rem', fontSize: '0.75rem', color: 'var(--text-2)' }}>
                   <div><span style={{ color: 'var(--text-3)' }}>payment_id:</span> <code>{latestCreated.link.payment_id}</code></div>
-                  <div><span style={{ color: 'var(--text-3)' }}>share url:</span> <code style={{ overflowX: 'auto' }}>{latestCreated.shareUrl}</code></div>
+                  <div style={{ display: 'grid', gap: '0.18rem', minWidth: 0 }}>
+                    <span style={{ color: 'var(--text-3)' }}>share url:</span>
+                    <code
+                      style={{
+                        display: 'block',
+                        minWidth: 0,
+                        maxWidth: '100%',
+                        whiteSpace: 'normal',
+                        overflowWrap: 'anywhere',
+                        wordBreak: 'break-word',
+                      }}
+                    >
+                      {latestCreated.shareUrl}
+                    </code>
+                  </div>
                   {latestCreated.sdkShareUrl && (
-                    <div><span style={{ color: 'var(--text-3)' }}>sdk share url:</span> <code style={{ overflowX: 'auto' }}>{latestCreated.sdkShareUrl}</code></div>
+                    <div style={{ display: 'grid', gap: '0.18rem', minWidth: 0 }}>
+                      <span style={{ color: 'var(--text-3)' }}>sdk share url:</span>
+                      <code
+                        style={{
+                          display: 'block',
+                          minWidth: 0,
+                          maxWidth: '100%',
+                          whiteSpace: 'normal',
+                          overflowWrap: 'anywhere',
+                          wordBreak: 'break-word',
+                        }}
+                      >
+                        {latestCreated.sdkShareUrl}
+                      </code>
+                    </div>
                   )}
-                  <div><span style={{ color: 'var(--text-3)' }}>/api/pay:</span> <code style={{ overflowX: 'auto' }}>{latestCreated.apiRequestUrl}</code></div>
+                  <div style={{ display: 'grid', gap: '0.18rem', minWidth: 0 }}>
+                    <span style={{ color: 'var(--text-3)' }}>/api/pay:</span>
+                    <code
+                      style={{
+                        display: 'block',
+                        minWidth: 0,
+                        maxWidth: '100%',
+                        whiteSpace: 'normal',
+                        overflowWrap: 'anywhere',
+                        wordBreak: 'break-word',
+                      }}
+                    >
+                      {latestCreated.apiRequestUrl}
+                    </code>
+                  </div>
                   <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                     <a
                       href={latestCreated.shareUrl}

@@ -1,6 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { toRaw, toHuman, toHex, fromHex, compareDecimalStrings } from '../src/utils.js';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { toRaw, toHuman, toHex, fromHex, compareDecimalStrings, resolveHomeDir } from '../src/utils.js';
 
 describe('toRaw', () => {
   it('converts integer amount', () => {
@@ -109,5 +111,18 @@ describe('compareDecimalStrings', () => {
 
   it('handles integers without decimal point', () => {
     assert.equal(compareDecimalStrings('10', '10'), 0);
+  });
+});
+
+describe('resolveHomeDir', () => {
+  it('returns a writable absolute directory', async () => {
+    const home = resolveHomeDir();
+    assert.equal(path.isAbsolute(home), true);
+
+    const probe = path.join(home, `.money-probe-${process.pid}-${Date.now()}`);
+    await fs.writeFile(probe, 'ok', 'utf-8');
+    const raw = await fs.readFile(probe, 'utf-8');
+    assert.equal(raw, 'ok');
+    await fs.rm(probe, { force: true });
   });
 });

@@ -12,6 +12,7 @@ import {
   listPaymentIntents,
 } from '../../../lib/demo/service';
 import type { SettlementChain } from '../../../lib/demo/types';
+import { normalizeLocalOrigin } from '../../../lib/origin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
       amount: body.amount ?? '10',
       expiryMinutes: body.expiryMinutes,
       settlementChain: body.settlementChain,
-      baseUrl: new URL(request.url).origin,
+      baseUrl: normalizeLocalOrigin(new URL(request.url).origin),
     });
 
     const response = NextResponse.json({

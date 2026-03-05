@@ -6,14 +6,87 @@
 
 import os from 'node:os';
 import path from 'node:path';
+import fs from 'node:fs';
+
+function isWritableDirectory(dir: string): boolean {
+  try {
+    const stats = fs.statSync(dir);
+    if (!stats.isDirectory()) return false;
+    fs.accessSync(dir, fs.constants.W_OK);
+    const probeName = `.money-write-probe-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const probePath = path.join(dir, probeName);
+    fs.writeFileSync(probePath, 'ok', { encoding: 'utf-8', flag: 'wx', mode: 0o600 });
+    fs.rmSync(probePath, { force: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function ensureWritableDirectory(dir: string): boolean {
+  try {
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    fs.accessSync(dir, fs.constants.W_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolve a writable home directory.
+ * Falls back to a temp directory when HOME/os.homedir() are unavailable.
+ */
+export function resolveHomeDir(): string {
+  const candidates: string[] = [];
+  const seen = new Set<string>();
+
+  const rawHome = process.env.HOME;
+  if (typeof rawHome === 'string' && rawHome.trim().length > 0) {
+    const resolved = path.resolve(rawHome);
+    if (!seen.has(resolved)) {
+      seen.add(resolved);
+      candidates.push(resolved);
+    }
+  }
+
+  try {
+    const osHome = os.homedir();
+    if (typeof osHome === 'string' && osHome.trim().length > 0) {
+      const resolved = path.resolve(osHome);
+      if (!seen.has(resolved)) {
+        seen.add(resolved);
+        candidates.push(resolved);
+      }
+    }
+  } catch {
+    // Ignore and continue to fallback.
+  }
+
+  for (const candidate of candidates) {
+    if (isWritableDirectory(candidate)) {
+      return candidate;
+    }
+  }
+
+  const tmpFallback = path.join(os.tmpdir(), '.money-home');
+  if (ensureWritableDirectory(tmpFallback)) {
+    return tmpFallback;
+  }
+
+  const cwdFallback = path.resolve('.money-home');
+  ensureWritableDirectory(cwdFallback);
+  return cwdFallback;
+}
 
 /**
  * Expand `~` in a path string to the user's home directory.
  */
 export function expandHome(p: string): string {
-  if (p === '~') return os.homedir();
+  const home = resolveHomeDir();
+  if (p === '~') return home;
   if (p.startsWith('~/') || p.startsWith('~\\')) {
-    return path.join(os.homedir(), p.slice(2));
+    return path.join(home, p.slice(2));
   }
   return path.resolve(p);
 }

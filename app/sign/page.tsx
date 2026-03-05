@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AgentFlowPanel } from '../components/agent-flow/agent-flow-panel';
 import type { ApiActionCardProps } from '../components/agent-flow/api-action-card';
+import { normalizeLocalOrigin } from '../lib/origin';
 
 type NetworkType = 'testnet' | 'mainnet';
 type SignUiState = 'idle' | 'signing' | 'signed' | 'verifying' | 'verified' | 'error';
@@ -157,7 +158,7 @@ export default function SignatureLabPage() {
   );
 
   useEffect(() => {
-    setOrigin(window.location.origin);
+    setOrigin(normalizeLocalOrigin(window.location.origin));
   }, []);
 
   async function runSign(): Promise<SignApiResponse> {
