@@ -95,7 +95,7 @@ const SCENARIOS: ScenarioDef[] = [
     ].join('\n'),
     recoverySnippet: [
       'await money.faucet({ chain: "fast", network: "testnet" });',
-      'await money.send({ chain: "fast", network: "testnet", to: "<valid set1...>", amount: "1" });',
+      'await money.send({ chain: "fast", network: "testnet", to: "<valid fast1...>", amount: "1" });',
     ].join('\n'),
   },
   {

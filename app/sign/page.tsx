@@ -63,7 +63,7 @@ const CHAIN_OPTIONS: ChainOption[] = [
     label: 'Fast',
     value: 'fast',
     signatureFormat: 'hex string',
-    addressHint: 'set1...',
+    addressHint: 'fast1...',
     note: 'Fast signatures are returned as raw hex strings; verify against a Fast bech32m address.',
   },
   {

@@ -12,6 +12,10 @@ function firstLines(value: string, limit = 26): string {
   return value.split('\n').slice(0, limit).join('\n');
 }
 
+function defaultTokenForReceive(chain: { value: string; token: string }): string {
+  return chain.value === 'fast' ? 'SETUSDC' : chain.token;
+}
+
 export default function ReceivePage() {
   const defaultChain = CHAINS[0];
 
@@ -20,7 +24,7 @@ export default function ReceivePage() {
   const [network, setNetwork] = useState<NetworkType>('testnet');
   const [receiver, setReceiver] = useState('');
   const [amount, setAmount] = useState('1');
-  const [token, setToken] = useState(defaultChain.token);
+  const [token, setToken] = useState(defaultTokenForReceive(defaultChain));
   const [memo, setMemo] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
   const [error, setError] = useState('');
@@ -38,7 +42,7 @@ export default function ReceivePage() {
   }, []);
 
   useEffect(() => {
-    setToken(selectedChain.token);
+    setToken(defaultTokenForReceive(selectedChain));
   }, [selectedChain]);
 
   function buildPayUrl(): string | null {
@@ -66,7 +70,7 @@ export default function ReceivePage() {
       amount: amount.trim(),
       chain,
       network,
-      token: token.trim() || selectedChain.token,
+      token: token.trim() || defaultTokenForReceive(selectedChain),
     });
     if (memo.trim()) params.set('memo', memo.trim());
 
@@ -123,11 +127,11 @@ export default function ReceivePage() {
       amount: amount.trim() || '1',
       chain,
       network,
-      token: token.trim() || selectedChain.token,
+      token: token.trim() || defaultTokenForReceive(selectedChain),
     });
     if (memo.trim()) params.set('memo', memo.trim());
     return params.toString();
-  }, [amount, chain, memo, network, receiver, selectedChain.sampleReceiver, selectedChain.token, token]);
+  }, [amount, chain, memo, network, receiver, selectedChain, token]);
 
   const agentActions = useMemo<ApiActionCardProps[]>(() => {
     const payUrl = `${origin || ''}/api/pay?${payQuery}`;
@@ -242,7 +246,7 @@ export default function ReceivePage() {
                 <input
                   value={token}
                   onChange={(event) => setToken(event.target.value)}
-                  placeholder={selectedChain.token}
+                  placeholder={defaultTokenForReceive(selectedChain)}
                   style={{ background: 'var(--code-bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.45rem 0.6rem' }}
                 />
               </label>

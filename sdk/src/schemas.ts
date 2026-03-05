@@ -113,7 +113,7 @@ export const SendResult = z.object({
 const sendMeta = {
   description: 'Send tokens to an address.',
   examples: [
-    'await money.send({ chain: "fast", to: "set1abc...", amount: 10 })',
+    'await money.send({ chain: "fast", to: "fast1abc...", amount: 10 })',
     'await money.send({ chain: "ethereum", to: "0xabc...", amount: 0.5, token: "USDC", network: "mainnet" })',
   ],
   notes: 'Chain must be set up first. Address is validated before sending.',
@@ -386,7 +386,7 @@ export const VerifySignResult = z.object({
 const verifySignMeta = {
   description: 'Verify a message signature.',
   examples: [
-    'await money.verifySign({ chain: "fast", message: "hello", signature: "ab12...", address: "set1abc..." })',
+    'await money.verifySign({ chain: "fast", message: "hello", signature: "ab12...", address: "fast1abc..." })',
     'await money.verifySign({ chain: "ethereum", message: "verify me", signature: "0xabc...", address: "0x123..." })',
   ],
   notes: 'Returns { valid: true } if the signature matches the address for the given message.',
@@ -444,7 +444,7 @@ const identifyChainsMeta = {
   description: 'Detect which blockchain(s) an address belongs to.',
   examples: [
     'await money.identifyChains({ address: "0x1234abcd..." })',
-    'await money.identifyChains({ address: "set1abc..." })',
+    'await money.identifyChains({ address: "fast1abc..." })',
   ],
   notes: 'Pattern-based detection. Does not verify on-chain. EVM addresses match all 11 EVM chains.',
 } as const;
@@ -678,7 +678,7 @@ export const PaymentLinkResult = z.object({
 const createPaymentLinkMeta = {
   description: 'Create a shareable payment link to request tokens on any chain.',
   examples: [
-    'await money.createPaymentLink({ receiver: "set1...", amount: 10, chain: "fast" })',
+    'await money.createPaymentLink({ receiver: "fast1...", amount: 10, chain: "fast" })',
     'await money.createPaymentLink({ receiver: "0xABC...", amount: 5, chain: "base", token: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", network: "mainnet" })',
     'await money.createPaymentLink({ receiver: "7nYB...", amount: 1, chain: "solana", memo: "coffee" })',
   ],

@@ -57,6 +57,10 @@ function statusColor(state: SendUiState): string {
   return 'var(--text-3)';
 }
 
+function defaultTokenForSend(chain: { value: string; token: string }): string {
+  return chain.value === 'fast' ? 'SETUSDC' : chain.token;
+}
+
 export default function SendPage() {
   const defaultChain = CHAINS[0];
 
@@ -65,7 +69,7 @@ export default function SendPage() {
   const [network, setNetwork] = useState<NetworkType>('testnet');
   const [to, setTo] = useState('');
   const [amount, setAmount] = useState('0.1');
-  const [token, setToken] = useState(defaultChain.token);
+  const [token, setToken] = useState(defaultTokenForSend(defaultChain));
   const [paymentId, setPaymentId] = useState('');
   const [state, setState] = useState<SendUiState>('idle');
   const [error, setError] = useState('');
@@ -81,7 +85,7 @@ export default function SendPage() {
   }, []);
 
   useEffect(() => {
-    setToken(selectedChain.token);
+    setToken(defaultTokenForSend(selectedChain));
   }, [selectedChain]);
 
   const sendBody = useMemo(
@@ -90,10 +94,10 @@ export default function SendPage() {
       amount: amount.trim() || '0.1',
       chain,
       network,
-      token: token.trim() || selectedChain.token,
+      token: token.trim() || defaultTokenForSend(selectedChain),
       ...(paymentId.trim() ? { payment_id: paymentId.trim() } : {}),
     }),
-    [amount, chain, network, paymentId, selectedChain.sampleReceiver, selectedChain.token, to, token],
+    [amount, chain, network, paymentId, selectedChain, to, token],
   );
 
   async function sendTokens(): Promise<SendExecutionResponse> {
@@ -261,7 +265,7 @@ export default function SendPage() {
                 <input
                   value={token}
                   onChange={(event) => setToken(event.target.value)}
-                  placeholder={selectedChain.token}
+                  placeholder={defaultTokenForSend(selectedChain)}
                   style={{ background: 'var(--code-bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.45rem 0.6rem' }}
                 />
               </label>
