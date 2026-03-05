@@ -33,6 +33,7 @@ export default async function Home() {
           <span className="nav-wordmark">money</span>
           <div className="nav-links">
             <a href="/merchant">Merchant Demo</a>
+            <a href="/agent-flow">Agent Flow UI</a>
             <a href="/pay">Pay</a>
             <a href="/skill.md">Skill</a>
             <a href="/money.bundle.js" download>Bundle</a>
@@ -204,6 +205,7 @@ export default async function Home() {
           <span className="footer-credit">Fast Protocol</span>
           <nav className="footer-nav">
             <a href="/merchant">Merchant Demo</a>
+            <a href="/agent-flow">Agent Flow UI</a>
             <a href="/pay">Pay</a>
             <a href="/skill.md">Skill</a>
             <a href="/money.bundle.js" download>
