@@ -28,18 +28,6 @@ export default async function Home() {
 
   return (
     <>
-      <nav className="nav">
-        <div className="nav-inner">
-          <span className="nav-wordmark">money</span>
-          <div className="nav-links">
-            <a href="/merchant">Merchant Demo</a>
-            <a href="/pay">Pay</a>
-            <a href="/skill.md">Skill</a>
-            <a href="/money.bundle.js" download>Bundle</a>
-          </div>
-        </div>
-      </nav>
-
       <main>
         <section className="hero">
           <div className="container">
@@ -148,6 +136,22 @@ export default async function Home() {
                 <span className="feature-desc">Message signing on any chain</span>
               </div>
               <div className="feature">
+                <span className="feature-title">Providers</span>
+                <span className="feature-desc">Registry visibility and API key control for routing</span>
+              </div>
+              <div className="feature">
+                <span className="feature-title">Tokens</span>
+                <span className="feature-desc">Discovery and deterministic alias resolution by decimals/address</span>
+              </div>
+              <div className="feature">
+                <span className="feature-title">Utilities</span>
+                <span className="feature-desc">Address-family detection and unit conversion preflight tools</span>
+              </div>
+              <div className="feature">
+                <span className="feature-title">Errors</span>
+                <span className="feature-desc">Structured MoneyError scenarios with guided recovery snippets</span>
+              </div>
+              <div className="feature">
                 <span className="feature-title">Export</span>
                 <span className="feature-desc">Export private keys for wallet backup</span>
               </div>
@@ -204,6 +208,15 @@ export default async function Home() {
           <span className="footer-credit">Fast Protocol</span>
           <nav className="footer-nav">
             <a href="/merchant">Merchant Demo</a>
+            <a href="/paywall">Paywall Studio</a>
+            <a href="/payment-links">Payment Links</a>
+            <a href="/swap">Swap Terminal</a>
+            <a href="/bridge">Bridge Console</a>
+            <a href="/sign">Signature Lab</a>
+            <a href="/providers">Providers</a>
+            <a href="/tokens">Tokens</a>
+            <a href="/utils">Utilities</a>
+            <a href="/errors">Errors</a>
             <a href="/pay">Pay</a>
             <a href="/skill.md">Skill</a>
             <a href="/money.bundle.js" download>
