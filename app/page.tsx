@@ -39,6 +39,7 @@ export default async function Home() {
             <a href="/swap">Swap Terminal</a>
             <a href="/bridge">Bridge Console</a>
             <a href="/sign">Signature Lab</a>
+            <a href="/providers">Providers</a>
             <a href="/pay">Pay</a>
             <a href="/skill.md">Skill</a>
             <a href="/money.bundle.js" download>Bundle</a>
@@ -154,6 +155,10 @@ export default async function Home() {
                 <span className="feature-desc">Message signing on any chain</span>
               </div>
               <div className="feature">
+                <span className="feature-title">Providers</span>
+                <span className="feature-desc">Registry visibility and API key control for routing</span>
+              </div>
+              <div className="feature">
                 <span className="feature-title">Export</span>
                 <span className="feature-desc">Export private keys for wallet backup</span>
               </div>
@@ -216,6 +221,7 @@ export default async function Home() {
             <a href="/swap">Swap Terminal</a>
             <a href="/bridge">Bridge Console</a>
             <a href="/sign">Signature Lab</a>
+            <a href="/providers">Providers</a>
             <a href="/pay">Pay</a>
             <a href="/skill.md">Skill</a>
             <a href="/money.bundle.js" download>
