@@ -1,4 +1,6 @@
 import { money, MoneyError } from '../../../../dist/src/index.js';
+import { ensureMoneyConfigDir } from '../../../lib/ensure-money-config-dir';
+import { applyServerWalletEnv } from '../../../lib/server-wallet-env';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,6 +23,19 @@ function badRequest(message: string) {
 }
 
 export async function POST(request: Request) {
+  try {
+    await ensureMoneyConfigDir();
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return Response.json(
+      {
+        error: `Failed to initialize SDK config directory: ${message}`,
+        code: 'CONFIG_DIR_INIT_FAILED',
+      },
+      { status: 500 },
+    );
+  }
+
   const parsed = (await request.json().catch(() => null)) as unknown;
   if (!isObject(parsed)) {
     return badRequest('Request body must be a JSON object.');
@@ -43,8 +58,12 @@ export async function POST(request: Request) {
     return badRequest('Amount must be a positive number.');
   }
 
+  const walletEnv = applyServerWalletEnv(chain, network);
+  let senderAddress: string | null = null;
+
   try {
     const setup = await money.setup({ chain, network });
+    senderAddress = setup.address;
     const result = await money.send({
       to,
       amount,
@@ -79,6 +98,8 @@ export async function POST(request: Request) {
           error: error.message,
           code: error.code,
           note: error.note ?? null,
+          senderAddress,
+          walletEnvSource: walletEnv.source,
         },
         { status },
       );
@@ -89,6 +110,8 @@ export async function POST(request: Request) {
       {
         error: message,
         code: 'UNKNOWN_ERROR',
+        senderAddress,
+        walletEnvSource: walletEnv.source,
       },
       { status: 500 },
     );

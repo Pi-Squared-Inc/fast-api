@@ -506,7 +506,7 @@ export default function AddressUnitsUtilityPage() {
                 <input
                   value={addressInput}
                   onChange={(event) => setAddressInput(event.target.value)}
-                  placeholder="0x... / set1... / base58"
+                  placeholder="0x... / fast1... / base58"
                   style={{ background: 'var(--code-bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.45rem 0.6rem' }}
                 />
               </label>

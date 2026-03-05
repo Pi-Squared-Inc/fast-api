@@ -10,6 +10,7 @@ import {
   PaywallError,
   issuePaywallUnlockGrant,
 } from '../../../../../lib/paywall/service';
+import { normalizeLocalOrigin } from '../../../../../lib/origin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -39,7 +40,7 @@ export async function POST(
     const unlocked = await issuePaywallUnlockGrant({
       intentId,
       buyerId,
-      baseUrl: new URL(request.url).origin,
+      baseUrl: normalizeLocalOrigin(new URL(request.url).origin),
     });
 
     const response = NextResponse.json(unlocked);

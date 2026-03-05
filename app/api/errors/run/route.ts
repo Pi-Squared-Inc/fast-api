@@ -67,8 +67,8 @@ function scenarioCatalog(): Record<ScenarioId, ScenarioDefinition> {
     insufficient_balance: {
       id: 'insufficient_balance',
       title: 'Insufficient Balance',
-      failRequest: { chain: 'fast', network: 'testnet', amount: '999999999999999999', token: 'SET' },
-      recoveryRequest: { chain: 'fast', network: 'testnet', amount: '1', token: 'SET' },
+      failRequest: { chain: 'fast', network: 'testnet', amount: '999999999999999999', token: 'FAST' },
+      recoveryRequest: { chain: 'fast', network: 'testnet', amount: '1', token: 'FAST' },
       failSnippet: [
         'const wallet = await money.setup({ chain: "fast", network: "testnet" });',
         'await money.send({',
@@ -80,7 +80,7 @@ function scenarioCatalog(): Record<ScenarioId, ScenarioDefinition> {
       ].join('\n'),
       recoverySnippet: [
         'await money.faucet({ chain: "fast", network: "testnet" });',
-        'await money.send({ chain: "fast", network: "testnet", to: "<valid set1...>", amount: "1" });',
+        'await money.send({ chain: "fast", network: "testnet", to: "<valid fast1...>", amount: "1" });',
       ].join('\n'),
       runFail: async () => {
         const setup = await money.setup({ chain: 'fast', network: 'testnet' });

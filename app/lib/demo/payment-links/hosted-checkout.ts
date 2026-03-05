@@ -36,7 +36,7 @@ function createHostedCheckoutProvider(id: Extract<PaymentLinkProvider, 'coinbase
     id,
     mode: 'hosted-checkout',
     async createLink(input) {
-      const checkoutUrl = new URL('/merchant/checkout', input.baseUrl);
+      const checkoutUrl = new URL('/merchant-dashboard/checkout', input.baseUrl);
       checkoutUrl.searchParams.set('intentId', input.intentId);
       checkoutUrl.searchParams.set('provider', id);
       return {
