@@ -9,6 +9,7 @@ export type AgentActionRequest = {
   url: string;
   headers?: Record<string, string>;
   body?: unknown;
+  snippets?: Partial<Record<SnippetTab, string>>;
 };
 
 export type AgentActionFailure = {
@@ -87,9 +88,18 @@ export function ApiActionCard(props: ApiActionCardProps) {
   const [tryItResult, setTryItResult] = useState<unknown>(null);
   const [tryItError, setTryItError] = useState('');
 
-  const curlSnippet = useMemo(() => toCurlSnippet(props.request), [props.request]);
-  const jsSnippet = useMemo(() => toJsSnippet(props.request), [props.request]);
-  const rawRequest = useMemo(() => toRawRequestJson(props.request), [props.request]);
+  const curlSnippet = useMemo(
+    () => props.request.snippets?.curl ?? toCurlSnippet(props.request),
+    [props.request],
+  );
+  const jsSnippet = useMemo(
+    () => props.request.snippets?.javascript ?? toJsSnippet(props.request),
+    [props.request],
+  );
+  const rawRequest = useMemo(
+    () => props.request.snippets?.raw_json ?? toRawRequestJson(props.request),
+    [props.request],
+  );
   const activeSnippet = activeTab === 'curl'
     ? curlSnippet
     : activeTab === 'javascript'
