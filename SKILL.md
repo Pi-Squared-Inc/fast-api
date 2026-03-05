@@ -1,5 +1,5 @@
 ---
-name: money
+name: fast-api
 version: {{VERSION}}
 description: >
   Universal payment SDK for AI agents. Send tokens, check balances, create payment links, swap tokens, bridge cross-chain,
@@ -12,14 +12,14 @@ description: >
 
 ---
 
-# MONEY SKILL
+# FAST API SKILL
 
 Everything works out of the box — RPCs, token addresses, explorer URLs, all built in for 13 chains, testnet and mainnet. No API keys or config files needed.
 
 ## Install
 
 ```bash
-npx create-money-skill
+npx skills add Pi-Squared-Inc/fast-api
 ```
 
 That's it! One command installs everything to `~/.money/`.
