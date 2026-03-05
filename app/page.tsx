@@ -39,10 +39,6 @@ export default async function Home() {
           </div>
         </section>
 
-        <div className="divider">
-          <span />
-        </div>
-
         <section id="install" className="section">
           <div className="container">
             <h2 className="section-label">Install</h2>
@@ -60,10 +56,6 @@ export default async function Home() {
             <p className="section-note">v{version}. Two files. No dependencies.</p>
           </div>
         </section>
-
-        <div className="divider">
-          <span />
-        </div>
 
         <section className="section">
           <div className="container">
@@ -103,7 +95,7 @@ export default async function Home() {
 
       <footer className="footer">
         <div className="container footer-inner">
-          <span className="footer-credit">Fast Protocol</span>
+          <span className="footer-credit">Fast.xyz</span>
           <nav className="footer-nav">
             <a href="/skill.md">Skill</a>
             <a href="/money.bundle.js" download>
