@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import localFont from 'next/font/local';
 import { JetBrains_Mono } from 'next/font/google';
 import Script from 'next/script';
+import { DemoSidebarShell } from './components/demo-sidebar-shell';
 import { ThemeToggle } from './components/theme-toggle';
 import './globals.css';
 
@@ -67,28 +68,14 @@ export default function RootLayout({
             </a>
             <div className="nav-actions">
               <div className="nav-links">
-                <a href="/merchant">Merchant Demo</a>
-                <a href="/paywall">Paywall Studio</a>
-                <a href="/payment-links">Payment Links</a>
-                <a href="/swap">Swap Terminal</a>
-                <a href="/bridge">Bridge Console</a>
-                <a href="/sign">Signature Lab</a>
-                <details className="nav-dropdown">
-                  <summary>Tools</summary>
-                  <div className="nav-dropdown-menu">
-                    <a href="/providers">Providers</a>
-                    <a href="/tokens">Tokens</a>
-                    <a href="/utils">Utilities</a>
-                    <a href="/errors">Errors</a>
-                  </div>
-                </details>
-                <a href="/pay">Pay</a>
+                <a href="/merchant">Docs</a>
+                <a href="/waitlist">Waitlist</a>
               </div>
               <ThemeToggle />
             </div>
           </div>
         </nav>
-        {children}
+        <DemoSidebarShell>{children}</DemoSidebarShell>
       </body>
     </html>
   );
