@@ -179,6 +179,32 @@ npm run build:sdk && node --test --test-force-exit dist/tests/config.test.js
 
 See [AGENTS.md](./AGENTS.md) for full coding guidelines, project layout, and conventions.
 
+## Deterministic Server Wallet (Vercel)
+
+To avoid per-instance random wallets in serverless environments, set a fixed private key in env vars:
+
+- `MONEY_FAST_PRIVATE_KEY`: Fast wallet private key (32-byte hex, optional `0x` prefix).
+- Optional per-network overrides:
+  - `MONEY_FAST_MAINNET_PRIVATE_KEY`
+  - `MONEY_FAST_TESTNET_PRIVATE_KEY`
+
+When set, missing keyfiles are deterministically seeded from env instead of generating a new wallet.
+
+### Protected wallet debug endpoint
+
+Set:
+
+- `MONEY_SEND_DEBUG_SECRET`: shared secret for send-wallet debug checks.
+
+Then query:
+
+```bash
+curl -sS "https://<host>/api/pay/send/debug?chain=fast&network=mainnet&token=SETUSDC" \
+  -H "x-money-debug-secret: $MONEY_SEND_DEBUG_SECRET"
+```
+
+This returns the exact sender address, discovered tokens, and balance diagnostics used by `/api/pay/send`.
+
 ## Paywall Storage
 
 The paywall server API under `app/api/paywall/*` supports two state backends:
