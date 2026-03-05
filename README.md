@@ -1,4 +1,4 @@
-# money
+# FAST API
 
 Universal payment SDK for AI agents. Send tokens, swap, bridge cross-chain, check prices, sign messages across 13 blockchain chains — or any custom EVM chain. RPCs, token addresses, explorer URLs all built in. Zero config required.
 
@@ -14,7 +14,7 @@ Same pattern on every chain. Only the chain name and address format change.
 ## Install
 
 ```bash
-npx create-money-skill
+npx skills add Pi-Squared-Inc/fast-api
 ```
 
 That's it! One command installs everything to `~/.money/`.
