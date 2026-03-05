@@ -1,7 +1,7 @@
 import { describe, it, mock, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { withX402 } from '../src/middleware.js';
+import { withX402, build402Body } from '../src/middleware.js';
 
 // ---------------------------------------------------------------------------
 // Shared test config
@@ -46,6 +46,29 @@ function makeValidHeader(overrides?: {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+describe('build402Body()', () => {
+  it('returns correct x402 response structure', () => {
+    const body = build402Body(config);
+
+    assert.equal(body.x402Version, 1);
+    assert.equal(body.accepts.length, 1);
+    assert.equal(body.accepts[0]?.scheme, 'exact');
+    assert.equal(body.accepts[0]?.network, 'fast');
+    assert.equal(body.accepts[0]?.maxAmountRequired, config.amount);
+    assert.equal(body.accepts[0]?.payTo, config.recipient);
+    assert.equal(body.accepts[0]?.asset, config.asset);
+  });
+
+  it('returns a plain object (not a Response)', () => {
+    const body = build402Body(config);
+
+    assert.equal(typeof body, 'object');
+    assert.ok(!(body instanceof Response), 'should be a plain object, not a Response');
+    assert.ok('x402Version' in body);
+    assert.ok('accepts' in body);
+  });
+});
 
 describe('withX402() middleware', () => {
   beforeEach(() => {
