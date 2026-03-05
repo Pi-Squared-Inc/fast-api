@@ -42,7 +42,6 @@ export default function RootLayout({
             <a href="/" className="nav-wordmark">money</a>
             <div className="nav-links">
               <a href="/merchant">Merchant Demo</a>
-              <a href="/agent-flow">Agent Flow UI</a>
               <a href="/paywall">Paywall Studio</a>
               <a href="/payment-links">Payment Links</a>
               <a href="/swap">Swap Terminal</a>

@@ -208,7 +208,6 @@ export default async function Home() {
           <span className="footer-credit">Fast Protocol</span>
           <nav className="footer-nav">
             <a href="/merchant">Merchant Demo</a>
-            <a href="/agent-flow">Agent Flow UI</a>
             <a href="/paywall">Paywall Studio</a>
             <a href="/payment-links">Payment Links</a>
             <a href="/swap">Swap Terminal</a>

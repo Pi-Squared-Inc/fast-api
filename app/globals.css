@@ -111,7 +111,7 @@ code { font-family: var(--font-mono), 'SF Mono', 'Consolas', monospace; }
 
 .nav-dropdown summary::after {
   content: '▾';
-  font-size: 0.62rem;
+  font-size: 0.88rem;
   line-height: 1;
   color: var(--text-3);
   transition: color 0.2s;
