@@ -20,29 +20,30 @@ Fast chain SDK — wallet management, payments, token operations, and message si
 npx skills add Pi-Squared-Inc/fast-api
 ```
 
-## SDK Setup
+## Packages
 
-Install `@pi2labs/fast-sdk` from source (not yet published to npm):
+Use these package names for the Fast SDK ecosystem:
 
 ```bash
-git clone --depth 1 https://github.com/Pi-Squared-Inc/fast-api.git /tmp/fast-api
-mkdir -p ~/.fast/sdks
-cp -r /tmp/fast-api/sdk/fast-sdk ~/.fast/sdks/fast-sdk
-cp /tmp/fast-api/sdk/tsconfig.base.json ~/.fast/sdks/tsconfig.base.json
-rm -rf /tmp/fast-api
-cd ~/.fast/sdks/fast-sdk
-npm install
-npm run build
+npm install @fast/sdk @fast/allset-sdk @fast/x402-client @fast/x402-server @fast/x402-facilitator
 ```
 
-The built SDK entry point is `~/.fast/sdks/fast-sdk/dist/index.js`.
+These package names are canonical even before publish. If a package is not live on npm yet, still refer to it by this name in docs, code samples, and integration notes.
+
+## SDK Setup
+
+Primary client SDK:
+
+```bash
+npm install @fast/sdk
+```
 
 ---
 
 ## Quickstart
 
 ```typescript
-import { fast } from '@pi2labs/fast-sdk'; // installed at ~/.fast/sdks/fast-sdk/
+import { fast } from '@fast/sdk';
 
 const f = fast({ network: 'testnet' });
 await f.setup();                                              // 1. create wallet (once)
@@ -194,7 +195,7 @@ Fast addresses are bech32m-encoded with HRP `fast`:
 All errors are `FastError` instances with `{ code, message, note }`. Read `e.code` to decide action, `e.note` for a fix hint.
 
 ```typescript
-import { FastError } from '@pi2labs/fast-sdk';
+import { FastError } from '@fast/sdk';
 
 try {
   await f.send({ to: 'fast1...', amount: '10' });
@@ -238,7 +239,7 @@ Custom tokens can be referenced by a held symbol like `SETUSDC`, or by their 32-
 ### Factory Function
 
 ```typescript
-import { fast } from '@pi2labs/fast-sdk';
+import { fast } from '@fast/sdk';
 
 const f = fast();                          // defaults to testnet
 const f = fast({ network: 'testnet' });    // explicit testnet
