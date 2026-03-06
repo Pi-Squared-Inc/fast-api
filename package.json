@@ -5,7 +5,8 @@
   "type": "module",
   "workspaces": [
     "sdk/fast-sdk",
-    "sdk/allset-sdk"
+    "sdk/allset-sdk",
+    "sdk/x402-server"
   ],
   "scripts": {
     "predev": "npm run build:sdk",
@@ -14,11 +15,13 @@
     "build": "next build",
     "prestart": "npm run build:sdk",
     "start": "next start",
-    "build:sdk": "npm run build:fast-sdk && npm run build:allset-sdk",
+    "build:sdk": "npm run build:fast-sdk && npm run build:allset-sdk && npm run build:x402-server",
     "build:fast-sdk": "tsc -p sdk/fast-sdk/tsconfig.json",
     "build:allset-sdk": "tsc -p sdk/allset-sdk/tsconfig.json",
-    "clean:sdk": "rm -rf sdk/fast-sdk/dist sdk/allset-sdk/dist",
-    "test:fast-sdk": "node --import tsx --test sdk/fast-sdk/tests/*.test.ts"
+    "build:x402-server": "tsc -p sdk/x402-server/tsconfig.json",
+    "clean:sdk": "rm -rf sdk/fast-sdk/dist sdk/allset-sdk/dist sdk/x402-server/dist",
+    "test:fast-sdk": "node --import tsx --test sdk/fast-sdk/tests/*.test.ts",
+    "test:x402-server": "node --import tsx --test sdk/x402-server/tests/*.test.ts"
   },
   "engines": {
     "node": ">=18"
