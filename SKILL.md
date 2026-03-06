@@ -281,6 +281,7 @@ Use one of:
 
 - `swap`, `quote` require `network: "mainnet"` (testnet DEXes have no liquidity)
 - `bridge` depends on provider: DeBridge requires `"mainnet"`, OmniSet requires `"testnet"`
+- OmniSet testnet supports Fast/EVM wrapped flows (`SET`/`WSET`) and `fastUSDC`<->`USDC` on Arbitrum Sepolia
 - Solana swaps require a free Jupiter API key: `money.setApiKey({ provider: "jupiter", apiKey: "..." })`
 - `price`, `tokenInfo` are read-only — work regardless of network
 
