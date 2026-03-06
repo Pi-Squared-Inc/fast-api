@@ -1484,6 +1484,674 @@ export const money = {
     };
   },
 
+  // ─── x402 payment ───────────────────────────────────────────────────────────
+
+  /**
+   * Pay for x402-protected content on FastSet or EVM networks.
+   * Automatically handles 402 Payment Required responses by:
+   * 1. Making initial request to get payment requirements
+   * 2. Creating and signing payment (TokenTransfer on FastSet, EIP-3009 on EVM)
+   * 3. Retrying the request with X-PAYMENT header
+   * 
+   * For EVM networks (arbitrum-sepolia, base-sepolia), uses EIP-3009 transferWithAuthorization.
+   * For FastSet networks, uses TokenTransfer with transaction certificate.
+   */
+  async x402Pay(params: { url: string; method?: string; headers?: Record<string, string>; body?: string; verbose?: boolean }): Promise<{
+    success: boolean;
+    statusCode: number;
+    headers: Record<string, string>;
+    body: unknown;
+    payment?: {
+      network: string;
+      amount: string;
+      recipient: string;
+      txHash: string;
+    };
+    note: string;
+    logs?: string[];
+  }> {
+    const { url, method = 'GET', headers: customHeaders = {}, body: requestBody, verbose = false } = params;
+    const logs: string[] = [];
+    const log = (msg: string) => { if (verbose) { logs.push(`[${new Date().toISOString()}] ${msg}`); logs.push(''); } };
+
+    log(`━━━ x402Pay START ━━━`);
+    log(`URL: ${url}`);
+    log(`Method: ${method}`);
+    if (Object.keys(customHeaders).length > 0) log(`Custom Headers: ${JSON.stringify(customHeaders)}`);
+
+    // Step 1: Make initial request to get 402 response
+    log(`[Step 1] Making initial request to check for 402...`);
+    log(`  → fetch(${url}, { method: "${method}" })`);
+    const initialRes = await fetch(url, {
+      method,
+      headers: customHeaders,
+      body: requestBody,
+    });
+    log(`  ← Response: ${initialRes.status} ${initialRes.statusText}`);
+
+    if (initialRes.status !== 402) {
+      // Not a 402, return the response as-is
+      log(`  ✓ Not a 402 response, returning as-is`);
+      const resHeaders: Record<string, string> = {};
+      initialRes.headers.forEach((v, k) => { resHeaders[k] = v; });
+      let resBody: unknown;
+      try {
+        resBody = await initialRes.json();
+      } catch {
+        resBody = await initialRes.text();
+      }
+      log(`━━━ x402Pay END (no payment needed) ━━━`);
+      return {
+        success: initialRes.ok,
+        statusCode: initialRes.status,
+        headers: resHeaders,
+        body: resBody,
+        note: initialRes.ok ? 'Request succeeded without payment.' : `Request failed with status ${initialRes.status}.`,
+        logs: verbose ? logs : undefined,
+      };
+    }
+
+    // Step 2: Parse 402 response to get payment requirements
+    log(`[Step 2] Parsing 402 payment requirements...`);
+    const paymentRequired = await initialRes.json() as {
+      x402Version?: number;
+      accepts?: Array<{
+        scheme: string;
+        network: string;
+        maxAmountRequired: string;
+        payTo: string;
+        asset?: string;
+        extra?: { name?: string; version?: string };
+      }>;
+    };
+    log(`  ← Payment Required: ${JSON.stringify(paymentRequired, null, 2)}`);
+
+    if (!paymentRequired.accepts || paymentRequired.accepts.length === 0) {
+      log(`  ✗ ERROR: No payment requirements found`);
+      throw new MoneyError('INVALID_PARAMS', 'No payment requirements in 402 response', {
+        note: 'The server returned 402 but did not include payment requirements.',
+      });
+    }
+
+    // Check for supported networks - prioritize FastSet, then EVM
+    const FASTSET_NETWORKS = ['fastset-devnet', 'fastset-mainnet', 'fast'];
+    const EVM_NETWORKS = ['arbitrum-sepolia', 'arbitrum', 'base-sepolia', 'base'];
+
+    const fastsetReq = paymentRequired.accepts.find(r => FASTSET_NETWORKS.includes(r.network));
+    const evmReq = paymentRequired.accepts.find(r => EVM_NETWORKS.includes(r.network));
+
+    log(`[Step 3] Selecting payment network...`);
+    log(`  Available networks: ${paymentRequired.accepts.map(r => r.network).join(', ')}`);
+    log(`  FastSet match: ${fastsetReq ? fastsetReq.network : 'none'}`);
+    log(`  EVM match: ${evmReq ? evmReq.network : 'none'}`);
+
+    if (fastsetReq) {
+      // Use FastSet payment path
+      log(`  → Using FastSet payment path (${fastsetReq.network})`);
+      return this._x402PayFastSet(url, method, customHeaders, requestBody, paymentRequired, fastsetReq, verbose, logs);
+    } else if (evmReq) {
+      // Use EVM payment path (EIP-3009)
+      log(`  → Using EVM payment path (${evmReq.network})`);
+      return this._x402PayEvm(url, method, customHeaders, requestBody, paymentRequired, evmReq, verbose, logs);
+    } else {
+      log(`  ✗ ERROR: No supported network found`);
+      throw new MoneyError('UNSUPPORTED_OPERATION', 'No supported payment network available', {
+        note: `Available networks: ${paymentRequired.accepts.map(r => r.network).join(', ')}. Supported: FastSet (fastset-devnet, fastset-mainnet) and EVM (arbitrum-sepolia, base-sepolia).`,
+      });
+    }
+  },
+
+  /**
+   * Internal: FastSet payment path for x402
+   */
+  async _x402PayFastSet(
+    url: string,
+    method: string,
+    customHeaders: Record<string, string>,
+    requestBody: string | undefined,
+    paymentRequired: { x402Version?: number },
+    fastsetReq: { network: string; maxAmountRequired: string; payTo: string; asset?: string },
+    verbose: boolean = false,
+    logs: string[] = []
+  ): Promise<{
+    success: boolean;
+    statusCode: number;
+    headers: Record<string, string>;
+    body: unknown;
+    payment?: { network: string; amount: string; recipient: string; txHash: string };
+    note: string;
+    logs?: string[];
+  }> {
+    const log = (msg: string) => { if (verbose) { logs.push(`[${new Date().toISOString()}] ${msg}`); logs.push(''); } };
+
+    log(`━━━ _x402PayFastSet START ━━━`);
+    log(`  Network: ${fastsetReq.network}`);
+    log(`  Amount: ${fastsetReq.maxAmountRequired} (raw)`);
+    log(`  Recipient: ${fastsetReq.payTo}`);
+
+    // Ensure Fast chain is set up
+    log(`[FastSet Step 1] Loading Fast chain config...`);
+    const config = await loadConfig();
+    const fastKey = configKey('fast', 'testnet');
+    const fastConfig = config.chains[fastKey];
+    if (!fastConfig) {
+      log(`  ✗ ERROR: Fast chain not configured`);
+      throw new MoneyError('CHAIN_NOT_CONFIGURED', 'Fast chain not configured', {
+        note: 'Set up Fast chain first:\n  await money.setup({ chain: "fast" })',
+      });
+    }
+    log(`  ✓ Config found: ${fastKey}`);
+    log(`  Keyfile: ${fastConfig.keyfile}`);
+    log(`  RPC: ${fastConfig.rpc}`);
+
+    // Get buyer wallet address and create tx executor
+    log(`[FastSet Step 2] Creating tx executor...`);
+    const keyfilePath = expandHome(fastConfig.keyfile);
+    const kp = await loadKeyfile(keyfilePath);
+    const { bech32m } = await import('bech32');
+    const pubKeyBytes = Buffer.from(kp.publicKey, 'hex');
+    const words = bech32m.toWords(pubKeyBytes);
+    const buyerAddress = bech32m.encode('fast', words, 90);
+    log(`  Buyer address: ${buyerAddress}`);
+
+    const rpcUrl = fastConfig.rpc;
+    const txExecutor = createFastTxExecutor(keyfilePath, rpcUrl, buyerAddress);
+    log(`  ✓ TxExecutor created`);
+
+    // Determine token ID from asset (if provided)
+    log(`[FastSet Step 3] Determining token ID...`);
+    let tokenId: Uint8Array;
+    if (fastsetReq.asset) {
+      tokenId = new Uint8Array(Buffer.from(fastsetReq.asset, 'base64'));
+      log(`  Token from asset (base64): ${fastsetReq.asset}`);
+    } else {
+      tokenId = new Uint8Array(32);
+      tokenId.set([0xfa, 0x57, 0x5e, 0x70], 0);
+      log(`  Using default token ID`);
+    }
+    log(`  Token ID (hex): ${Buffer.from(tokenId).toString('hex')}`);
+
+    // Create and submit TokenTransfer transaction
+    log(`[FastSet Step 4] Sending TokenTransfer transaction...`);
+    log(`  → txExecutor.sendTokenTransfer(${fastsetReq.payTo}, ${fastsetReq.maxAmountRequired}, tokenId)`);
+    const txStartTime = Date.now();
+    const { txHash, certificate } = await txExecutor.sendTokenTransfer(
+      fastsetReq.payTo,
+      fastsetReq.maxAmountRequired,
+      tokenId
+    );
+    const txDuration = Date.now() - txStartTime;
+    log(`  ← Transaction complete in ${txDuration}ms`);
+    log(`  txHash: ${txHash}`);
+    log(`  Certificate signatures: ${(certificate as { signatures?: unknown[] })?.signatures?.length ?? 0}`);
+
+    // Build x402 payment payload
+    log(`[FastSet Step 5] Building x402 payment payload...`);
+    const paymentPayload = {
+      x402Version: paymentRequired.x402Version ?? 1,
+      scheme: 'exact',
+      network: fastsetReq.network,
+      payload: {
+        type: 'signAndSendTransaction',
+        transactionCertificate: certificate,
+      },
+    };
+    log(`  Payload (JSON):`);
+    log(`  ${JSON.stringify(paymentPayload, null, 2).split('\n').join('\n  ')}`);
+
+    const payloadBase64 = Buffer.from(JSON.stringify(paymentPayload)).toString('base64');
+    log(`  Payload base64 (${payloadBase64.length} chars):`);
+    log(`  ${payloadBase64.slice(0, 200)}...${payloadBase64.slice(-50)}`);
+
+    // Retry request with X-PAYMENT header
+    log(`[FastSet Step 6] Sending paid request with X-PAYMENT header...`);
+    log(`  Command: fetch("${url}", {`);
+    log(`    method: "${method}",`);
+    log(`    headers: { "X-PAYMENT": "<base64 payload>" }`);
+    log(`  })`);
+    const paidStartTime = Date.now();
+    const paidRes = await fetch(url, {
+      method,
+      headers: { ...customHeaders, 'X-PAYMENT': payloadBase64 },
+      body: requestBody,
+    });
+    const paidDuration = Date.now() - paidStartTime;
+    log(`  ← Response: ${paidRes.status} ${paidRes.statusText} (${paidDuration}ms)`);
+
+    const resHeaders: Record<string, string> = {};
+    paidRes.headers.forEach((v, k) => { resHeaders[k] = v; });
+    log(`  Response headers: ${JSON.stringify(resHeaders)}`);
+
+    let resBody: unknown;
+    try { resBody = await paidRes.json(); } catch { resBody = await paidRes.text(); }
+    log(`  Response body: ${JSON.stringify(resBody)}`);
+
+    const amountRaw = BigInt(fastsetReq.maxAmountRequired);
+    const decimals = 6;
+    const amountHuman = (Number(amountRaw) / Math.pow(10, decimals)).toString();
+
+    log(`━━━ _x402PayFastSet END ━━━`);
+    log(`  Success: ${paidRes.ok}`);
+    log(`  Amount paid: ${amountHuman} USDC`);
+    log(`  Explorer: https://explorer.fast.xyz/tx/${txHash}`);
+
+    return {
+      success: paidRes.ok,
+      statusCode: paidRes.status,
+      headers: resHeaders,
+      body: resBody,
+      payment: { network: fastsetReq.network, amount: amountHuman, recipient: fastsetReq.payTo, txHash },
+      note: paidRes.ok
+        ? `Payment of ${amountHuman} USDC successful. Content delivered.`
+        : `Payment submitted (tx: ${txHash}) but server returned ${paidRes.status}.`,
+      logs: verbose ? logs : undefined,
+    };
+  },
+
+  /**
+   * Internal: EVM payment path for x402 using EIP-3009 transferWithAuthorization
+   */
+  async _x402PayEvm(
+    url: string,
+    method: string,
+    customHeaders: Record<string, string>,
+    requestBody: string | undefined,
+    paymentRequired: { x402Version?: number },
+    evmReq: { network: string; maxAmountRequired: string; payTo: string; asset?: string; extra?: { name?: string; version?: string } },
+    verbose: boolean = false,
+    logs: string[] = []
+  ): Promise<{
+    success: boolean;
+    statusCode: number;
+    headers: Record<string, string>;
+    body: unknown;
+    payment?: { network: string; amount: string; recipient: string; txHash: string; bridged?: boolean; bridgeTxHash?: string };
+    note: string;
+    logs?: string[];
+  }> {
+    const log = (msg: string) => { if (verbose) { logs.push(`[${new Date().toISOString()}] ${msg}`); logs.push(''); } };
+
+    log(`━━━ _x402PayEvm START ━━━`);
+    log(`  Network: ${evmReq.network}`);
+    log(`  Amount: ${evmReq.maxAmountRequired} (raw) = ${Number(evmReq.maxAmountRequired) / 1e6} USDC`);
+    log(`  Recipient: ${evmReq.payTo}`);
+    log(`  Asset (USDC): ${evmReq.asset}`);
+    log(`  Extra: ${JSON.stringify(evmReq.extra)}`);
+
+    // Map x402 network to our chain config
+    log(`[EVM Step 1] Mapping network to chain config...`);
+    const networkToChain: Record<string, { chain: string; network: NetworkType; chainId: number }> = {
+      'arbitrum-sepolia': { chain: 'arbitrum', network: 'testnet', chainId: 421614 },
+      'arbitrum': { chain: 'arbitrum', network: 'mainnet', chainId: 42161 },
+      'base-sepolia': { chain: 'base', network: 'testnet', chainId: 84532 },
+      'base': { chain: 'base', network: 'mainnet', chainId: 8453 },
+    };
+
+    const chainInfo = networkToChain[evmReq.network];
+    if (!chainInfo) {
+      log(`  ✗ ERROR: Unsupported EVM network: ${evmReq.network}`);
+      throw new MoneyError('UNSUPPORTED_OPERATION', `Unsupported EVM network: ${evmReq.network}`, {
+        note: `Supported EVM networks: ${Object.keys(networkToChain).join(', ')}`,
+      });
+    }
+    log(`  ✓ Mapped to: chain=${chainInfo.chain}, network=${chainInfo.network}, chainId=${chainInfo.chainId}`);
+
+    // Load EVM wallet
+    log(`[EVM Step 2] Loading EVM wallet config...`);
+    const config = await loadConfig();
+    const evmKey = configKey(chainInfo.chain, chainInfo.network);
+    let evmConfig = config.chains[evmKey];
+    log(`  Config key: ${evmKey}`);
+    
+    // If chain not configured, try to set it up using the EVM keyfile
+    if (!evmConfig) {
+      log(`  Chain not configured, attempting auto-setup...`);
+      const evmKeyfilePath = expandHome('~/.money/keys/evm.json');
+      const fs = await import('fs/promises');
+      try {
+        await fs.access(evmKeyfilePath);
+        log(`  → Found EVM keyfile at ${evmKeyfilePath}`);
+        // Auto-configure the EVM chain
+        log(`  → Running: money.setup({ chain: "${chainInfo.chain}", network: "${chainInfo.network}" })`);
+        await this.setup({ chain: chainInfo.chain as any, network: chainInfo.network });
+        const updatedConfig = await loadConfig();
+        evmConfig = updatedConfig.chains[evmKey];
+        log(`  ✓ Auto-setup complete`);
+      } catch {
+        log(`  ✗ ERROR: No EVM keyfile found and chain not configured`);
+        throw new MoneyError('CHAIN_NOT_CONFIGURED', `${chainInfo.chain} chain not configured`, {
+          note: `Set up ${chainInfo.chain} chain first:\n  await money.setup({ chain: "${chainInfo.chain}", network: "${chainInfo.network}" })`,
+        });
+      }
+    }
+    log(`  Keyfile: ${evmConfig.keyfile}`);
+
+    // Load private key and create wallet
+    log(`[EVM Step 3] Loading wallet and creating account...`);
+    const keyfilePath = expandHome(evmConfig.keyfile);
+    const keyfileData = JSON.parse(await (await import('fs/promises')).readFile(keyfilePath, 'utf-8'));
+    // Ensure private key has 0x prefix
+    let privateKey = keyfileData.privateKey as string;
+    if (!privateKey.startsWith('0x')) {
+      privateKey = '0x' + privateKey;
+    }
+    const account = privateKeyToAccount(privateKey as `0x${string}`);
+    log(`  ✓ Account address: ${account.address}`);
+
+    // Get the USDC contract address (from 402 response or use default)
+    const usdcAddress = evmReq.asset as `0x${string}`;
+    if (!usdcAddress) {
+      log(`  ✗ ERROR: No USDC asset address in payment requirements`);
+      throw new MoneyError('INVALID_PARAMS', 'No USDC asset address in payment requirements', {
+        note: 'The server must provide the USDC contract address in the asset field.',
+      });
+    }
+    log(`  USDC contract: ${usdcAddress}`);
+    log(`  USDC name (for EIP-712): ${evmReq.extra?.name ?? 'USDC'}`);
+    log(`  USDC version: ${evmReq.extra?.version ?? '2'}`);
+  
+
+    // ─── Auto-Bridge Logic ────────────────────────────────────────────────────
+    log(`[EVM Step 4] Checking USDC balance and auto-bridge need...`);
+    // Check USDC balance and auto-bridge from FastSet if insufficient
+    const requiredAmount = BigInt(evmReq.maxAmountRequired);
+    const usdcDecimals = 6;
+    let bridged = false;
+    let bridgeTxHash: string | undefined;
+    log(`  Required: ${Number(requiredAmount) / 1e6} USDC (${requiredAmount} raw)`);
+
+    // Get current USDC balance on EVM chain using the specific asset address from 402 response
+    log(`  Checking USDC balance on ${evmReq.network}...`);
+    log(`  → getAdapter(${evmKey}).getBalance(${account.address}, ${usdcAddress})`);
+    let currentBalance = 0n;
+    try {
+      // Use the adapter directly to check balance of the specific token address
+      const evmAdapter = await getAdapter(evmKey);
+      const balResult = await evmAdapter.getBalance(account.address, usdcAddress);
+      // Balance is returned as formatted amount (e.g., "0.1"), convert to raw
+      currentBalance = BigInt(Math.floor(parseFloat(balResult.amount) * Math.pow(10, usdcDecimals)));
+      log(`  ← Balance: ${balResult.amount} USDC (${currentBalance} raw)`);
+    } catch (err) {
+      // Balance check failed, assume 0
+      log(`  ← Balance check failed: ${err instanceof Error ? err.message : String(err)}, assuming 0`);
+      currentBalance = 0n;
+    }
+
+    // If insufficient balance, attempt to bridge from FastSet
+    if (currentBalance < requiredAmount) {
+      const shortfall = requiredAmount - currentBalance;
+      // Bridge exactly the required amount (no buffer)
+      const amountToBridge = shortfall;
+      const amountToBridgeHuman = Number(amountToBridge) / Math.pow(10, usdcDecimals);
+      log(`  ⚠ Insufficient balance! Need to bridge ${amountToBridgeHuman} USDC`);
+      log(`    Current: ${Number(currentBalance) / 1e6} USDC`);
+      log(`    Required: ${Number(requiredAmount) / 1e6} USDC`);
+      log(`    Shortfall: ${amountToBridgeHuman} USDC`);
+
+      // Check if Fast chain is configured
+      const fastKey = configKey('fast', chainInfo.network);
+      const fastConfig = config.chains[fastKey];
+      if (!fastConfig) {
+        log(`  ✗ ERROR: Fast chain not configured for auto-bridge`);
+        throw new MoneyError('INSUFFICIENT_BALANCE', `Need ${Number(requiredAmount) / 1e6} USDC, have ${Number(currentBalance) / 1e6}. Fast chain not configured for auto-bridge.`, {
+          note: `Set up Fast chain first:\n  await money.setup({ chain: "fast", network: "${chainInfo.network}" })\nThen bridge manually:\n  await money.bridge({ from: { chain: "fast", token: "SETUSDC" }, to: { chain: "${chainInfo.chain}" }, amount: ${amountToBridgeHuman} })`,
+        });
+      }
+      log(`  ✓ Fast chain configured, checking SETUSDC balance...`);
+
+      // Check SETUSDC balance on Fast using direct RPC (adapter has decimals issue)
+      log(`  → money.balance({ chain: "fast", token: "SETUSDC" })`);
+      let fastBalance = 0n;
+      try {
+        // SETUSDC token ID
+        const SETUSDC_HEX = '1e744900021182b293538bb6685b77df095e351364d550021614ce90c8ab9e0a';
+        const fastBalResult = await this.balance({ chain: 'fast', network: chainInfo.network, token: SETUSDC_HEX });
+        // The adapter returns amount with 18 decimals, but SETUSDC has 6
+        // Multiply back by 10^18, then divide by 10^6 to get correct raw amount
+        const reportedAmount = parseFloat(fastBalResult.amount);
+        fastBalance = BigInt(Math.floor(reportedAmount * Math.pow(10, 18)));
+        log(`  ← FastSet SETUSDC balance: ${reportedAmount} (reported) → ${Number(fastBalance) / 1e6} (adjusted)`);
+      } catch (err) {
+        log(`  ← FastSet balance check failed: ${err instanceof Error ? err.message : String(err)}`);
+        fastBalance = 0n;
+      }
+
+      if (fastBalance < amountToBridge) {
+        log(`  ✗ ERROR: Insufficient FastSet SETUSDC for auto-bridge`);
+        throw new MoneyError('INSUFFICIENT_BALANCE', `Need ${Number(requiredAmount) / 1e6} USDC, have ${Number(currentBalance) / 1e6}. FastSet SETUSDC balance (${Number(fastBalance) / 1e6}) is also insufficient for auto-bridge.`, {
+          note: `Fund your FastSet wallet with SETUSDC first.`,
+        });
+      }
+
+      // Bridge SETUSDC → USDC (destination is the specific asset address)
+      log(`[EVM Step 4b] Auto-bridging SETUSDC → USDC...`);
+      log(`  → money.bridge({ from: { chain: "fast", token: "SETUSDC" }, to: { chain: "${chainInfo.chain}" }, amount: ${amountToBridgeHuman} })`);
+      const bridgeStartTime = Date.now();
+      try {
+        const bridgeResult = await this.bridge({
+          from: { chain: 'fast', token: 'SETUSDC' },
+          to: { chain: chainInfo.chain as 'arbitrum' | 'base', token: 'SETUSDC' },
+          amount: amountToBridgeHuman,
+          network: chainInfo.network,
+        });
+        bridged = true;
+        bridgeTxHash = bridgeResult.txHash;
+        const bridgeDuration = Date.now() - bridgeStartTime;
+        log(`  ← Bridge tx submitted in ${bridgeDuration}ms`);
+        log(`    txHash: ${bridgeTxHash}`);
+        log(`    Explorer: https://explorer.fast.xyz/tx/${bridgeTxHash}`);
+
+        // Wait for USDC to arrive (poll with timeout)
+        log(`  Waiting for USDC to arrive on ${evmReq.network}...`);
+        const maxWaitMs = 120000; // 2 minutes
+        const pollIntervalMs = 2000; // 2 seconds
+        const startTime = Date.now();
+        let arrived = false;
+        let pollCount = 0;
+
+        while (Date.now() - startTime < maxWaitMs) {
+          await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+          pollCount++;
+          try {
+            const evmAdapter = await getAdapter(evmKey);
+            const newBalResult = await evmAdapter.getBalance(account.address, usdcAddress);
+            // Balance is returned as formatted amount (e.g., "0.1"), convert to raw
+            const newBalance = BigInt(Math.floor(parseFloat(newBalResult.amount) * Math.pow(10, usdcDecimals)));
+            log(`  [Poll ${pollCount}] Balance: ${Number(newBalance) / 1e6} USDC (need ${Number(requiredAmount) / 1e6})`);
+            if (newBalance >= requiredAmount) {
+              arrived = true;
+              currentBalance = newBalance;
+              break;
+            }
+          } catch {
+            log(`  [Poll ${pollCount}] Balance check failed, continuing...`);
+            // Continue polling
+          }
+        }
+
+        if (!arrived) {
+          log(`  ✗ ERROR: Bridge timeout after ${maxWaitMs / 1000}s`);
+          throw new MoneyError('TX_FAILED', `Bridge transaction submitted (${bridgeTxHash}) but USDC has not arrived after ${maxWaitMs / 1000}s.`, {
+            note: `The bridge may still be processing. Check your balance later and retry:\n  await money.balance({ chain: "${chainInfo.chain}", token: "SETUSDC" })`,
+          });
+        }
+        const totalBridgeTime = Date.now() - bridgeStartTime;
+        log(`  ✓ Bridge complete! USDC arrived in ${totalBridgeTime}ms (${pollCount} polls)`);
+        log(`    New balance: ${Number(currentBalance) / 1e6} USDC`);
+      } catch (err) {
+        if (err instanceof MoneyError) throw err;
+        log(`  ✗ ERROR: Auto-bridge failed: ${err instanceof Error ? err.message : String(err)}`);
+        throw new MoneyError('TX_FAILED', `Auto-bridge failed: ${err instanceof Error ? err.message : String(err)}`, {
+          note: `Bridge manually:\n  await money.bridge({ from: { chain: "fast", token: "SETUSDC" }, to: { chain: "${chainInfo.chain}" }, amount: ${amountToBridgeHuman} })`,
+        });
+      }
+    } else {
+      log(`  ✓ Sufficient balance: ${Number(currentBalance) / 1e6} USDC >= ${Number(requiredAmount) / 1e6} required`);
+    }
+
+    // ─── EIP-3009 Authorization ───────────────────────────────────────────────
+    log(`[EVM Step 5] Building EIP-3009 transferWithAuthorization...`);
+    // EIP-3009 authorization parameters
+    const authorization = {
+      from: account.address,
+      to: evmReq.payTo as `0x${string}`,
+      value: evmReq.maxAmountRequired,
+      validAfter: '0',
+      validBefore: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour from now
+      nonce: ('0x' + Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('hex')) as `0x${string}`,
+    };
+    log(`  Authorization params:`);
+    log(`    from: ${authorization.from}`);
+    log(`    to: ${authorization.to}`);
+    log(`    value: ${authorization.value} (${Number(authorization.value) / 1e6} USDC)`);
+    log(`    validAfter: ${authorization.validAfter}`);
+    log(`    validBefore: ${authorization.validBefore}`);
+    log(`    nonce: ${authorization.nonce}`);
+
+    // EIP-712 typed data for TransferWithAuthorization
+    const authorizationTypes = {
+      TransferWithAuthorization: [
+        { name: 'from', type: 'address' },
+        { name: 'to', type: 'address' },
+        { name: 'value', type: 'uint256' },
+        { name: 'validAfter', type: 'uint256' },
+        { name: 'validBefore', type: 'uint256' },
+        { name: 'nonce', type: 'bytes32' },
+      ],
+    };
+
+    // Use name/version from payment requirements or defaults
+    const usdcName = evmReq.extra?.name ?? 'USDC';
+    const usdcVersion = evmReq.extra?.version ?? '2';
+
+    const domain = {
+      name: usdcName,
+      version: usdcVersion,
+      chainId: chainInfo.chainId,
+      verifyingContract: usdcAddress,
+    };
+    log(`  EIP-712 Domain:`);
+    log(`    name: "${domain.name}"`);
+    log(`    version: "${domain.version}"`);
+    log(`    chainId: ${domain.chainId}`);
+    log(`    verifyingContract: ${domain.verifyingContract}`);
+
+    // Sign the authorization
+    log(`[EVM Step 6] Signing EIP-712 typed data...`);
+    log(`  Command: account.signTypedData({`);
+    log(`    domain: ${JSON.stringify(domain)},`);
+    log(`    types: { TransferWithAuthorization: [...] },`);
+    log(`    primaryType: "TransferWithAuthorization",`);
+    log(`    message: {`);
+    log(`      from: "${authorization.from}",`);
+    log(`      to: "${authorization.to}",`);
+    log(`      value: ${authorization.value}n,`);
+    log(`      validAfter: ${authorization.validAfter}n,`);
+    log(`      validBefore: ${authorization.validBefore}n,`);
+    log(`      nonce: "${authorization.nonce}"`);
+    log(`    }`);
+    log(`  })`);
+    const signStartTime = Date.now();
+    const signature = await account.signTypedData({
+      domain,
+      types: authorizationTypes,
+      primaryType: 'TransferWithAuthorization',
+      message: {
+        from: authorization.from,
+        to: authorization.to,
+        value: BigInt(authorization.value),
+        validAfter: BigInt(authorization.validAfter),
+        validBefore: BigInt(authorization.validBefore),
+        nonce: authorization.nonce,
+      },
+    });
+    const signDuration = Date.now() - signStartTime;
+    log(`  Response: Signature generated in ${signDuration}ms`);
+    log(`    Signature (full): ${signature}`);
+
+    // Build x402 EVM payment payload
+    log(`[EVM Step 7] Building x402 payment payload...`);
+    const paymentPayload = {
+      x402Version: paymentRequired.x402Version ?? 1,
+      scheme: 'exact',
+      network: evmReq.network,
+      payload: {
+        signature,
+        authorization,
+      },
+    };
+    log(`  Payload (JSON):`);
+    log(`  ${JSON.stringify(paymentPayload, null, 2).split('\n').join('\n  ')}`);
+
+    const payloadBase64 = Buffer.from(JSON.stringify(paymentPayload)).toString('base64');
+    log(`  Payload base64 (${payloadBase64.length} chars):`);
+    log(`  ${payloadBase64}`);
+
+    // Retry request with X-PAYMENT header
+    log(`[EVM Step 8] Sending paid request with X-PAYMENT header...`);
+    log(`  Command: fetch("${url}", {`);
+    log(`    method: "${method}",`);
+    log(`    headers: { "X-PAYMENT": "<base64 payload above>" }`);
+    log(`  })`);
+    const paidStartTime = Date.now();
+    const paidRes = await fetch(url, {
+      method,
+      headers: { ...customHeaders, 'X-PAYMENT': payloadBase64 },
+      body: requestBody,
+    });
+    const paidDuration = Date.now() - paidStartTime;
+    log(`  ← Response: ${paidRes.status} ${paidRes.statusText} (${paidDuration}ms)`);
+
+    const resHeaders: Record<string, string> = {};
+    paidRes.headers.forEach((v, k) => { resHeaders[k] = v; });
+    log(`  Response headers: ${JSON.stringify(resHeaders)}`);
+
+    let resBody: unknown;
+    try { resBody = await paidRes.json(); } catch { resBody = await paidRes.text(); }
+    log(`  Response body: ${JSON.stringify(resBody)}`);
+
+    // Extract settlement txHash from response if available
+    let settleTxHash = signature.slice(0, 66); // Default to signature prefix
+    if (typeof resBody === 'object' && resBody !== null) {
+      const rb = resBody as Record<string, unknown>;
+      if (typeof rb.txHash === 'string') {
+        settleTxHash = rb.txHash;
+        log(`  Settlement txHash from response: ${settleTxHash}`);
+      }
+    }
+
+    const amountRaw = BigInt(evmReq.maxAmountRequired);
+    const amountHuman = (Number(amountRaw) / Math.pow(10, usdcDecimals)).toString();
+
+    log(`━━━ _x402PayEvm END ━━━`);
+    log(`  Success: ${paidRes.ok}`);
+    log(`  Amount paid: ${amountHuman} USDC`);
+    log(`  Bridged: ${bridged}${bridgeTxHash ? ` (${bridgeTxHash})` : ''}`);
+    if (settleTxHash.startsWith('0x') && settleTxHash.length === 66) {
+      log(`  Settlement explorer: https://sepolia.arbiscan.io/tx/${settleTxHash}`);
+    }
+
+    const bridgeNote = bridged ? ` (auto-bridged ${bridgeTxHash?.slice(0, 10)}...)` : '';
+    return {
+      success: paidRes.ok,
+      statusCode: paidRes.status,
+      headers: resHeaders,
+      body: resBody,
+      payment: { 
+        network: evmReq.network, 
+        amount: amountHuman, 
+        recipient: evmReq.payTo, 
+        txHash: settleTxHash,
+        bridged,
+        bridgeTxHash,
+      },
+      note: paidRes.ok
+        ? `EVM payment of ${amountHuman} USDC successful${bridgeNote}. Content delivered.`
+        : `Payment signed but server returned ${paidRes.status}. The facilitator will submit the transaction.`,
+      logs: verbose ? logs : undefined,
+    };
+  },
+
   // ─── discovery ──────────────────────────────────────────────────────────────
 
   help(): HelpEntry[] {

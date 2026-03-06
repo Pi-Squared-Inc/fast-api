@@ -113,9 +113,10 @@ const ClaimTypeBcs = bcs.enum('ClaimType', {
   TokenCreation: TokenCreationBcs,
   TokenManagement: TokenManagementBcs,
   Mint: MintBcs,
+  Burn: bcs.struct('Burn', { token_id: bcs.bytes(32), amount: AmountBcs }),  // CRITICAL: Must be at index 4
   StateInitialization: bcs.struct('StateInitialization', { dummy: bcs.u8() }),
   StateUpdate: bcs.struct('StateUpdate', { dummy: bcs.u8() }),
-  ExternalClaim: ExternalClaimFullBcs,
+  ExternalClaim: ExternalClaimFullBcs,  // Now at correct index 7
   StateReset: bcs.struct('StateReset', { dummy: bcs.u8() }),
   JoinCommittee: bcs.struct('JoinCommittee', { dummy: bcs.u8() }),
   LeaveCommittee: bcs.struct('LeaveCommittee', { dummy: bcs.u8() }),
@@ -770,7 +771,7 @@ export function createFastTxExecutor(
       return await withKey<FastTransferResult>(keyfilePath, async (keypair) => {
         const accountInfo = (await rpcCall(rpcUrl, 'proxy_getAccountInfo', {
           address: senderPubkey,
-          token_balances_filter: null,
+          token_balances_filter: [],
           state_key_filter: null,
           certificate_by_nonce: null,
         })) as { next_nonce: number } | null;
@@ -827,7 +828,7 @@ export function createFastTxExecutor(
       return await withKey<FastTransferResult>(keyfilePath, async (keypair) => {
         const accountInfo = (await rpcCall(rpcUrl, 'proxy_getAccountInfo', {
           address: senderPubkey,
-          token_balances_filter: null,
+          token_balances_filter: [],
           state_key_filter: null,
           certificate_by_nonce: null,
         })) as { next_nonce: number } | null;
