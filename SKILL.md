@@ -1,17 +1,20 @@
 ---
-name: fast-api
+name: fast-skill
 description: >
-  Router skill for the FAST ecosystem. Use when the user needs the right FAST package or flow:
-  Fast network wallet and payment work with @fastxyz/sdk, bridging between Fast and EVM with
-  @fastxyz/allset-sdk, paying 402-protected APIs with @fastxyz/x402-client, protecting routes with
-  @fastxyz/x402-server, or running x402 verification and settlement with
-  @fastxyz/x402-facilitator. Trigger on Fast balances, Fast transfers, fastUSDC, AllSet bridge
-  deposits or withdrawals, x402, HTTP 402 paywalls, or API monetization.
+  Router skill for the FAST ecosystem. Use when the user asks about FAST, fastUSDC, AllSet,
+  @fastxyz/sdk, @fastxyz/allset-sdk, @fastxyz/x402-client, @fastxyz/x402-server, or
+  @fastxyz/x402-facilitator; wants Fast balances, Fast transfers, Fast to EVM or EVM to Fast
+  bridging, or wants to pay for or protect an API with FAST x402 packages. Do not use for generic
+  EVM wallets, generic bridging, unrelated HTTP 402 questions, or non-FAST payment stacks.
+compatibility: >
+  Portable across Claude- and Codex-style skill runtimes with Node.js package install support and
+  network access. Examples assume TypeScript and default to FAST testnet unless the user
+  explicitly asks for mainnet.
 metadata:
-  version: 0.1.0
+  version: 0.2.0
 ---
 
-# FAST API
+# FAST Skill
 
 Single entrypoint for the FAST SDK ecosystem.
 
@@ -21,10 +24,17 @@ Single entrypoint for the FAST SDK ecosystem.
 npx skills add fastxyz/fast-skill
 ```
 
-Install source and skill name are different on purpose:
+## Example Requests
 
-- install source: `fastxyz/fast-skill`
-- skill name inside `SKILL.md`: `fast-api`
+- "Check my FAST testnet balance and send SET to another `fast1...` address"
+- "Bridge USDC from Arbitrum Sepolia into Fast"
+- "Use the FAST x402 packages to protect an Express API route"
+
+## Do Not Use For
+
+- generic EVM wallet code that does not touch FAST
+- arbitrary EVM to EVM bridging presented as one SDK call
+- unrelated HTTP 402 questions, payment compliance research, or non-FAST API monetization stacks
 
 ## Package Map
 
@@ -82,6 +92,12 @@ Load a flow playbook when the user asks for an end-to-end scenario:
 - Fast sends are irreversible.
 - Never overwrite `~/.fast/keys/`.
 - Bridge and settlement operations can move funds or consume gas. Confirm addresses and network choice before final code.
+
+## Common Issues
+
+- If the request only says `x402` or `402`, confirm it is specifically about the FAST `@fastxyz/*` packages before routing here.
+- If the user asks for unsupported routes or token mappings, stop and cite the shipped constraint from [references/capabilities.md](./references/capabilities.md) instead of approximating a solution.
+- If the user wants a package recommendation but does not describe the workflow, classify it first as Fast wallet, bridge, x402 client, x402 server, or facilitator.
 
 ## Working Pattern
 
