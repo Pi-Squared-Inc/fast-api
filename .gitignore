@@ -5,6 +5,7 @@ node_modules/
 *.tgz
 .DS_Store
 tsconfig.tsbuildinfo
+# Local contributor guide for this workspace only
 AGENTS.md
 .env*
 .pnpm-store/

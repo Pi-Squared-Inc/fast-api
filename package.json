@@ -1,0 +1,9 @@
+{
+  "name": "fast-skill",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "validate": "node scripts/validate-doc-links.mjs && node scripts/validate-package-surfaces.mjs",
+    "inventory": "node scripts/sync-references.mjs"
+  }
+}

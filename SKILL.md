@@ -1,253 +1,92 @@
 ---
-name: fast-sdk
+name: fast-api
 description: >
-  Fast chain SDK for AI agents. Setup wallets, send SET tokens, check balances,
-  sign and verify messages, list token holdings, look up token metadata, submit claims,
-  and export wallet info on Fast chain.
-  Use when asked to pay, transfer, check a balance, sign a message, verify a signature,
-  list tokens, look up token info, or interact with Fast chain.
-  Do NOT use for EVM chain operations, swap, bridge, yield farming, lending, or staking.
-
+  Router skill for the FAST ecosystem. Use when the user needs the right FAST package or flow:
+  Fast network wallet and payment work with @fastxyz/sdk, bridging between Fast and EVM with
+  @fastxyz/allset-sdk, paying 402-protected APIs with @fastxyz/x402-client, protecting routes with
+  @fastxyz/x402-server, or running x402 verification and settlement with
+  @fastxyz/x402-facilitator. Trigger on Fast balances, Fast transfers, fastUSDC, AllSet bridge
+  deposits or withdrawals, x402, HTTP 402 paywalls, or API monetization.
+metadata:
+  version: 0.1.0
 ---
 
-# FAST SDK SKILL
+# FAST API
 
-Fast chain SDK — wallet management, payments, token operations, and message signing. No API keys or config files needed.
+Single entrypoint for the FAST SDK ecosystem.
 
 ## Install
 
 ```bash
-npx skills add fastxyz/fast-api
+npx skills add fastxyz/fast-skill
 ```
 
-## Packages
+Install source and skill name are different on purpose:
 
-Use these package names for the Fast SDK ecosystem:
+- install source: `fastxyz/fast-skill`
+- skill name inside `SKILL.md`: `fast-api`
 
-```bash
-npm install @fastxyz/sdk @fastxyz/allset-sdk @fastxyz/x402-client @fastxyz/x402-server @fastxyz/x402-facilitator
-```
+## Package Map
 
-These package names are canonical even before publish. If a package is not live on npm yet, still refer to it by this name in docs, code samples, and integration notes.
+- `@fastxyz/sdk`: Fast network wallet setup, balances, sends, signing, token lookup, low-level claim submission
+- `@fastxyz/allset-sdk`: bridge flows between Fast and supported EVM routes
+- `@fastxyz/x402-client`: pay 402-protected APIs
+- `@fastxyz/x402-server`: return 402 requirements and protect routes
+- `@fastxyz/x402-facilitator`: verify and settle x402 payments
 
-## SDK Setup
+If an umbrella x402 package is introduced later, treat it as a wrapper. The current source-of-truth API surface is still the role-specific client, server, and facilitator packages.
 
-Primary client SDK:
+## Start Here
 
-```bash
-npm install @fastxyz/sdk
-```
+Read [references/capabilities.md](./references/capabilities.md) first when the request involves multiple packages or unclear support.
 
----
+Then route by task:
 
-## Quickstart
+- Fast wallet, balance, send, token info, signatures: [references/fast-sdk.md](./references/fast-sdk.md)
+- Bridge between Fast and EVM: [references/allset-sdk.md](./references/allset-sdk.md)
+- Pay for a protected API: [references/x402-client.md](./references/x402-client.md)
+- Add payments to an API: [references/x402-server.md](./references/x402-server.md)
+- Run verification or settlement infrastructure: [references/x402-facilitator.md](./references/x402-facilitator.md)
 
-```typescript
-import { fast } from '@fastxyz/sdk';
+Load a flow playbook when the user asks for an end-to-end scenario:
 
-const f = fast({ network: 'testnet' });
-await f.setup();                                              // 1. create wallet (once)
-const bal = await f.balance();                                // 2. check balance
-const tx = await f.send({ to: 'fast1qxy...', amount: '1.0' }); // 3. send tokens
-```
+- Fast to Fast transfer: [flows/fast-to-fast-payment.md](./flows/fast-to-fast-payment.md)
+- EVM to Fast deposit: [flows/evm-to-fast-deposit.md](./flows/evm-to-fast-deposit.md)
+- Fast to EVM withdraw: [flows/fast-to-evm-withdraw.md](./flows/fast-to-evm-withdraw.md)
+- Chain to chain via Fast: [flows/chain-to-chain-via-fast.md](./flows/chain-to-chain-via-fast.md)
+- Pay an x402 API: [flows/x402-pay-an-api.md](./flows/x402-pay-an-api.md)
+- Protect an x402 API: [flows/x402-protect-an-api.md](./flows/x402-protect-an-api.md)
 
----
+## Routing Rules
 
-## Rules
+### 1. Choose the smallest package that fits
 
-1. **Default is testnet.** Never pass `network: 'mainnet'` unless the user explicitly requested mainnet. Mainnet uses real money.
-2. **Sends are irreversible.** Verify the address before calling `send()`.
-3. **Amounts are strings in human units.** `'10'` means 10 SET, not 10 raw units.
-4. **NEVER delete, overwrite, or modify files in `~/.fast/keys/`.** These are wallet private keys. Loss means permanent, irreversible loss of funds.
+- Do not default to multiple FAST packages if one package solves the task.
+- Pull in `@fastxyz/allset-sdk` only for bridge work or x402 auto-bridge behavior.
+- Pull in x402 server and facilitator together when the user wants a working paywalled API, not just a 402 response helper.
 
----
+### 2. Default to testnets unless the user explicitly asks for mainnet
 
-## API Reference
+- `@fastxyz/sdk` defaults to `testnet`.
+- `@fastxyz/allset-sdk` currently exposes testnet-oriented bridge routes.
+- x402 packages list both testnet and mainnet-style networks, but do not move a user to mainnet silently.
 
-### `setup()`
+### 3. Treat support limits as code-level constraints
 
-Create or load a wallet. Must be called before other methods.
+- If a route or token is not in the shipped SDK config, say so clearly before writing code.
+- Do not claim AllSet supports arbitrary EVM to EVM bridging in one call. Cross-chain EVM flows are composed from two legs through Fast.
+- Do not claim x402 auto-bridge works on every EVM network; check the current bridge helper and capability matrix.
 
-```typescript
-const { address } = await f.setup();
-// → { address: 'fast1abc...' }
-```
+### 4. Respect irreversible operations
 
-### `balance(opts?)`
+- Fast sends are irreversible.
+- Never overwrite `~/.fast/keys/`.
+- Bridge and settlement operations can move funds or consume gas. Confirm addresses and network choice before final code.
 
-Get balance for native SET or a specific token by hex ID.
+## Working Pattern
 
-```typescript
-const bal = await f.balance();
-// → { amount: '42.5', token: 'SET' }
-
-const custom = await f.balance({ token: '0xfa575e70...' });
-// → { amount: '100.0', token: '0xfa575e70...' }
-```
-
-### `send(params)`
-
-Send tokens to a `fast1...` address. Defaults to native SET. Custom tokens can be passed by a held symbol like `SETUSDC` or by raw hex token ID.
-
-```typescript
-const tx = await f.send({ to: 'fast1abc...', amount: '10.0' });
-// → { txHash: '0x...', explorerUrl: 'https://explorer.fastset.xyz/txs/0x...' }
-
-// Custom token by hex ID
-const tx2 = await f.send({ to: 'fast1abc...', amount: '5.0', token: '0x1e7449...' });
-```
-
-| Param | Type | Required | Description |
-|---|---|---|---|
-| `to` | `string` | yes | Recipient `fast1...` address |
-| `amount` | `string` | yes | Human-readable amount (e.g. `'1.5'`) |
-| `token` | `string` | no | Held token symbol like `SETUSDC`, or a hex token ID. Defaults to native SET. |
-
-### `sign(params)`
-
-Sign a message with the wallet's Ed25519 key.
-
-```typescript
-const { signature, address } = await f.sign({ message: 'hello' });
-```
-
-### `verify(params)`
-
-Verify an Ed25519 signature against a `fast1...` address.
-
-```typescript
-const { valid } = await f.verify({
-  message: 'hello',
-  signature: '...',
-  address: 'fast1abc...',
-});
-```
-
-### `tokens()`
-
-List all tokens held on-chain with balances.
-
-```typescript
-const list = await f.tokens();
-// → [{ symbol: 'SET', address: '0xfa575e70...', balance: '42.5', decimals: 18 }, ...]
-```
-
-### `tokenInfo(params)`
-
-Get on-chain metadata for a token by held symbol or hex token ID.
-
-```typescript
-const info = await f.tokenInfo({ token: '0xfa575e70...' });
-// → { name: 'SET', symbol: 'SET', address: '0xfa575e70...', decimals: 18, totalSupply: '...', admin: '...', minters: [...] }
-```
-
-### `exportKeys()`
-
-Export public key and address. Never exposes the private key.
-
-```typescript
-const { publicKey, address } = await f.exportKeys();
-```
-
-### `address` (readonly)
-
-The current wallet address, or `null` if `setup()` hasn't been called.
-
-```typescript
-console.log(f.address); // 'fast1abc...' or null
-```
-
-### `submit(params)` (advanced)
-
-Submit an arbitrary claim to the Fast chain. Returns transaction hash and certificate.
-
-```typescript
-const result = await f.submit({
-  recipient: 'fast1abc...',
-  claim: {
-    TokenTransfer: {
-      token_id: tokenIdBytes,
-      amount: '1000000',
-      user_data: null,
-    },
-  },
-});
-// → { txHash: '0x...', certificate: { ... } }
-```
-
-This is a low-level method. For standard token transfers, use `send()` instead.
-
----
-
-## Address Format
-
-Fast addresses are bech32m-encoded with HRP `fast`:
-
-| Format | Example |
-|---|---|
-| On-chain | `fast1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh` |
-| Underlying | 32-byte Ed25519 public key |
-
----
-
-## Error Recovery
-
-All errors are `FastError` instances with `{ code, message, note }`. Read `e.code` to decide action, `e.note` for a fix hint.
-
-```typescript
-import { FastError } from '@fastxyz/sdk';
-
-try {
-  await f.send({ to: 'fast1...', amount: '10' });
-} catch (e: unknown) {
-  if (e instanceof FastError) {
-    console.log(e.code, e.note);
-  }
-}
-```
-
-| `e.code` | Action |
-|---|---|
-| `INSUFFICIENT_BALANCE` | Fund the wallet, retry. |
-| `CHAIN_NOT_CONFIGURED` | Call `f.setup()`, retry. |
-| `TX_FAILED` | Wait 5s, retry once. If still fails, stop. |
-| `INVALID_ADDRESS` | Do not retry. Confirm address with user. |
-| `TOKEN_NOT_FOUND` | Verify the held token symbol or hex token ID is correct. |
-| `INVALID_PARAMS` | Read `e.note` for correct call shape. |
-| `UNSUPPORTED_OPERATION` | Check `e.note` — operation may not be available. |
-
----
-
-## Key Concepts
-
-### Wallet
-
-- **Algorithm**: Ed25519
-- **Key storage**: `~/.fast/keys/fast.json` (mode 0600, with backup at `~/.fast/keys/backups/fast.json`)
-- **Config storage**: `~/.fast/config.json`
-- **Override**: Set `FAST_CONFIG_DIR` env var to change the config directory
-- One wallet per network. Same key file for testnet and mainnet.
-
-### Native Token
-
-- **Symbol**: SET
-- **Decimals**: 18
-- **Token ID**: `0xfa575e70...` (32-byte hex)
-
-Custom tokens can be referenced by a held symbol like `SETUSDC`, or by their 32-byte hex token ID in `balance()`, `send()`, and `tokenInfo()`.
-
-### Factory Function
-
-```typescript
-import { fast } from '@fastxyz/sdk';
-
-const f = fast();                          // defaults to testnet
-const f = fast({ network: 'testnet' });    // explicit testnet
-const f = fast({ network: 'mainnet' });    // mainnet — only with user consent
-```
-
----
-
-## NOT for this skill
-
-This skill cannot help with: swap, bridge, EVM chain operations, yield farming, lending, staking, payment links, or price lookups.
+1. Classify the request: Fast payment, bridge, x402 client, x402 server, or facilitator.
+2. Read the matching reference file.
+3. If the task is scenario-based, read the matching flow file too.
+4. Implement against the package API that actually exists in code today.
+5. Call out unsupported routes instead of papering over them.

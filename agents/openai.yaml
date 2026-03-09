@@ -1,0 +1,7 @@
+interface:
+  display_name: "FAST API"
+  short_description: "Route Fast payments, bridges, and x402 flows"
+  default_prompt: "Use $fast-api to choose the right FAST package and implement a Fast payment, bridge, or x402 API flow."
+
+policy:
+  allow_implicit_invocation: true
