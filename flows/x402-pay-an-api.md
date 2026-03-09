@@ -2,6 +2,47 @@
 
 Use `@fastxyz/x402-client` when the user is the payer.
 
+## Fast Example
+
+`@fastxyz/sdk` creates or loads the local Fast wallet during `setup()`. The current SDK stores the keypair at `~/.fast/keys/fast.json` by default, or at `$FAST_CONFIG_DIR/keys/fast.json` if `FAST_CONFIG_DIR` is set. `exportKeys()` returns `publicKey` and `address`, so read the keyfile to get `privateKey` before calling `x402Pay(...)`.
+
+```ts
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+
+import { fast } from '@fastxyz/sdk';
+import { x402Pay } from '@fastxyz/x402-client';
+
+const fastClient = fast({ network: 'testnet' });
+
+await fastClient.setup();
+
+const { publicKey, address } = await fastClient.exportKeys();
+const fastConfigDir = process.env.FAST_CONFIG_DIR
+  ? process.env.FAST_CONFIG_DIR.startsWith('~')
+    ? path.join(os.homedir(), process.env.FAST_CONFIG_DIR.slice(1))
+    : process.env.FAST_CONFIG_DIR
+  : path.join(os.homedir(), '.fast');
+const keyfilePath = path.join(fastConfigDir, 'keys', 'fast.json');
+const { privateKey } = JSON.parse(
+  await fs.readFile(keyfilePath, 'utf8'),
+) as {
+  privateKey: string;
+};
+
+const result = await x402Pay({
+  url: 'https://api.example.com/premium',
+  wallet: {
+    type: 'fast',
+    privateKey,
+    publicKey,
+    address,
+  },
+  verbose: true,
+});
+```
+
 ## EVM Example
 
 ```ts
