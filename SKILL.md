@@ -4,7 +4,7 @@ description: >
   Router skill for the FAST ecosystem. Use when the user asks about FAST, fastUSDC, AllSet,
   @fastxyz/sdk, @fastxyz/allset-sdk, @fastxyz/x402-client, @fastxyz/x402-server, or
   @fastxyz/x402-facilitator; wants Fast balances, Fast transfers, Fast to EVM or EVM to Fast
-  bridging, needs to top up Fast-side USDC via the hosted ramp link, or wants to pay for or
+  bridging, needs to top up Fast-side USDC via the hosted ramp link on `https://ramp.fast.xyz`, or wants to pay for or
   protect an API with FAST x402 packages. Do not use for generic EVM wallets, generic bridging,
   unrelated HTTP 402 questions, or non-FAST payment stacks.
 compatibility: >
@@ -102,7 +102,7 @@ Load a flow playbook when the user asks for an end-to-end scenario:
 - If the request only says `x402` or `402`, confirm it is specifically about the FAST `@fastxyz/*` packages before routing here.
 - If the user asks for unsupported routes or token mappings, stop and cite the shipped constraint from [references/capabilities.md](./references/capabilities.md) instead of approximating a solution.
 - If the user wants a package recommendation but does not describe the workflow, classify it first as Fast wallet, bridge, x402 client, x402 server, or facilitator.
-- If the user needs more Fast-side USDC and already has a `fast1...` address, prefer offering the hosted ramp link over inventing a custom funding workflow.
+- If the user needs more Fast-side USDC and already has a `fast1...` address, prefer offering the hosted ramp link on `https://ramp.fast.xyz` over inventing a custom funding workflow.
 
 ## Working Pattern
 
