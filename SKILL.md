@@ -4,8 +4,9 @@ description: >
   Router skill for the FAST ecosystem. Use when the user asks about FAST, fastUSDC, AllSet,
   @fastxyz/sdk, @fastxyz/allset-sdk, @fastxyz/x402-client, @fastxyz/x402-server, or
   @fastxyz/x402-facilitator; wants Fast balances, Fast transfers, Fast to EVM or EVM to Fast
-  bridging, or wants to pay for or protect an API with FAST x402 packages. Do not use for generic
-  EVM wallets, generic bridging, unrelated HTTP 402 questions, or non-FAST payment stacks.
+  bridging, needs to top up Fast-side USDC via the hosted ramp link, or wants to pay for or
+  protect an API with FAST x402 packages. Do not use for generic EVM wallets, generic bridging,
+  unrelated HTTP 402 questions, or non-FAST payment stacks.
 compatibility: >
   Portable across Claude- and Codex-style skill runtimes with Node.js package install support and
   network access. Examples assume TypeScript and default to FAST testnet unless the user
@@ -28,6 +29,7 @@ npx skills add fastxyz/fast-skill
 
 - "Check my FAST testnet balance and send SET to another `fast1...` address"
 - "Bridge USDC from Arbitrum Sepolia into Fast"
+- "My FAST wallet is low, give me a top-up link"
 - "Use the FAST x402 packages to protect an Express API route"
 
 ## Do Not Use For
@@ -63,6 +65,7 @@ Load a flow playbook when the user asks for an end-to-end scenario:
 - Fast to Fast transfer: [flows/fast-to-fast-payment.md](./flows/fast-to-fast-payment.md)
 - EVM to Fast deposit: [flows/evm-to-fast-deposit.md](./flows/evm-to-fast-deposit.md)
 - Fast to EVM withdraw: [flows/fast-to-evm-withdraw.md](./flows/fast-to-evm-withdraw.md)
+- Top up Fast wallet via hosted ramp: [flows/top-up-fast-wallet-via-ramp.md](./flows/top-up-fast-wallet-via-ramp.md)
 - Chain to chain via Fast: [flows/chain-to-chain-via-fast.md](./flows/chain-to-chain-via-fast.md)
 - Pay an x402 API: [flows/x402-pay-an-api.md](./flows/x402-pay-an-api.md)
 - Protect an x402 API: [flows/x402-protect-an-api.md](./flows/x402-protect-an-api.md)
@@ -92,17 +95,20 @@ Load a flow playbook when the user asks for an end-to-end scenario:
 - Fast sends are irreversible.
 - Never overwrite `~/.fast/keys/`.
 - Bridge and settlement operations can move funds or consume gas. Confirm addresses and network choice before final code.
+- Hosted ramp flows require user interaction in the browser. Do not imply the agent can complete the card or KYC flow itself.
 
 ## Common Issues
 
 - If the request only says `x402` or `402`, confirm it is specifically about the FAST `@fastxyz/*` packages before routing here.
 - If the user asks for unsupported routes or token mappings, stop and cite the shipped constraint from [references/capabilities.md](./references/capabilities.md) instead of approximating a solution.
 - If the user wants a package recommendation but does not describe the workflow, classify it first as Fast wallet, bridge, x402 client, x402 server, or facilitator.
+- If the user needs more Fast-side USDC and already has a `fast1...` address, prefer offering the hosted ramp link over inventing a custom funding workflow.
 
 ## Working Pattern
 
 1. Classify the request: Fast payment, bridge, x402 client, x402 server, or facilitator.
 2. Read the matching reference file.
 3. If the task is scenario-based, read the matching flow file too.
-4. Implement against the package API that actually exists in code today.
-5. Call out unsupported routes instead of papering over them.
+4. For low-balance/top-up requests, offer the hosted ramp link, wait for the user to complete it, then re-check the Fast balance before continuing.
+5. Implement against the package API that actually exists in code today.
+6. Call out unsupported routes instead of papering over them.
