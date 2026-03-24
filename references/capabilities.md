@@ -19,7 +19,7 @@ Use this file to decide which FAST package owns a request and whether the reques
 - Root package is the Node entrypoint. Use `@fastxyz/sdk/browser` for browser-safe provider helpers and `@fastxyz/sdk/core` for pure helpers.
 - Built-in networks: `testnet`, `mainnet`
 - Custom named networks are allowed when config provides RPC and optionally explorer / network ID metadata.
-- Bundled token symbols currently resolve `FAST` and `testUSDC` on `testnet`, and `FAST` plus `fastUSDC` on `mainnet`.
+- Bundled token symbols currently resolve `FAST` and `testUSDC` on `testnet`, and `FAST` plus `USDC` on `mainnet`.
 
 ### AllSet SDK
 
@@ -30,8 +30,8 @@ Use this file to decide which FAST package owns a request and whether the reques
   - Fast -> EVM withdraw via `sendToExternal(...)`
   - Fast -> EVM intent execution via `executeIntent(...)`
 - Bundled bridge config is testnet-only:
-  - `ethereum` -> chain ID `11155111`
-  - `arbitrum` -> chain ID `421614`
+  - `ethereum-sepolia` -> chain ID `11155111`
+  - `arbitrum-sepolia` -> chain ID `421614`
   - `base` -> chain ID `8453`
 - Bundled mainnet `chains` config is empty. Do not imply turnkey bundled mainnet routing.
 - `createEvmExecutor(...)` only accepts chain IDs `11155111`, `421614`, and `8453`.
@@ -48,7 +48,7 @@ Use this file to decide which FAST package owns a request and whether the reques
   - EVM: `ethereum-sepolia`, `arbitrum-sepolia`, `arbitrum`, `base-sepolia`, `base`
 - If both Fast and EVM are accepted and both wallets are present, the client prefers the Fast path.
 - The helper does not pin the remote `402` payload for you. Treat network, asset, recipient, and amount as untrusted input.
-- Auto-bridge is not generic. In the current shipped helper, only the bundled `base` path resolves a bridge config.
+- Auto-bridge is not generic. In the current shipped helper, bridge configs are explicit and currently resolve `ethereum-sepolia`, `arbitrum-sepolia`, and `base`.
 
 ### x402 Server
 
@@ -100,7 +100,7 @@ Stop and call out the limitation before coding when:
 
 - the user asks for Fast SDK code built around `fast()` or `setup()`
 - the user asks for an AllSet route that is not Fast <-> EVM
-- the user asks for AllSet chain names like `ethereum-sepolia` or `arbitrum-sepolia` instead of the shipped chain keys `ethereum` and `arbitrum`
+- the user asks for legacy AllSet testnet chain names `ethereum` or `arbitrum` instead of the shipped chain keys `ethereum-sepolia` and `arbitrum-sepolia`
 - the requested AllSet token is not the shipped `USDC`, `fastUSDC`, or `testUSDC` mapping
 - the request assumes all x402 networks support auto-bridge
 - the request assumes the x402 client network list equals end-to-end server + facilitator support

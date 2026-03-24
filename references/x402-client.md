@@ -97,7 +97,7 @@ Provide both wallets to enable auto-bridge:
 wallet: [fastWallet, evmWallet]
 ```
 
-Current bridge helper configs are explicit, not generic. In the shipped helper, only the bundled `base` path resolves an AllSet bridge config today.
+Current bridge helper configs are explicit, not generic. In the shipped helper, bundled bridge configs currently resolve `ethereum-sepolia`, `arbitrum-sepolia`, and `base`.
 
 In production, only provide both wallets after the user confirms the bridge path, source wallet, destination
 network, and spend ceiling. Otherwise pass a single wallet so the payment either succeeds on that network or fails closed.

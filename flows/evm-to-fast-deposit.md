@@ -25,7 +25,7 @@ const evmClients = createEvmExecutor(
 const allset = new AllSetProvider({ network: 'testnet' });
 
 const result = await allset.sendToFast({
-  chain: 'arbitrum',
+  chain: 'arbitrum-sepolia',
   token: 'USDC',
   amount: '1000000',
   from: account.address,
@@ -38,7 +38,7 @@ const result = await allset.sendToFast({
 
 - `to` must be `fast1...`
 - `amount` is raw base units
-- bundled AllSet chain keys are `ethereum`, `arbitrum`, and `base`
+- bundled AllSet chain keys are `ethereum-sepolia`, `arbitrum-sepolia`, and `base`
 - use `@fastxyz/allset-sdk/node` for explicit runtime imports; the root package currently re-exports the same runtime APIs too
 - if approval is needed, the executor will handle it before deposit
 - unsupported token mappings should be called out before writing code
