@@ -43,16 +43,16 @@ This SDK does not expose a single EVM -> EVM bridge call. Cross-chain EVM moveme
 ## Current Support Limits
 
 - Bundled bridge config is testnet-only
-- Shipped chain keys are `ethereum`, `arbitrum`, and `base`
+- Shipped chain keys are `ethereum-sepolia`, `arbitrum-sepolia`, and `base`
 - Bundled chain IDs are:
-  - `ethereum` -> `11155111`
-  - `arbitrum` -> `421614`
+  - `ethereum-sepolia` -> `11155111`
+  - `arbitrum-sepolia` -> `421614`
   - `base` -> `8453`
 - Bundled mainnet config exists, but its `chains` map is empty
 - `createEvmExecutor(...)` only supports chain IDs `11155111`, `421614`, and `8453`
 - Bundled token mapping is `USDC`, with `fastUSDC` and `testUSDC` normalized to the Fast-side USDC route
 - Amounts are raw 6-decimal base-unit strings such as `'1000000'` for 1 USDC
-- Hard cutover: do not call AllSet with chain names like `arbitrum-sepolia` or `ethereum-sepolia`. The shipped SDK keys are `arbitrum` and `ethereum`.
+- Hard cutover: do not write new AllSet examples with legacy testnet keys like `arbitrum` or `ethereum`. The shipped SDK keys are `arbitrum-sepolia` and `ethereum-sepolia`.
 
 ## EVM To Fast Deposit
 
@@ -71,7 +71,7 @@ const evmClients = createEvmExecutor(
 const allset = new AllSetProvider({ network: 'testnet' });
 
 const result = await allset.sendToFast({
-  chain: 'arbitrum',
+  chain: 'arbitrum-sepolia',
   token: 'USDC',
   amount: '1000000',
   from: account.address,
@@ -93,8 +93,8 @@ const fastWallet = await FastWallet.fromKeyfile('~/.fast/keys/default.json', fas
 const allset = new AllSetProvider({ network: 'testnet' });
 
 const result = await allset.sendToExternal({
-  chain: 'arbitrum',
-  token: 'fastUSDC',
+  chain: 'arbitrum-sepolia',
+  token: 'USDC',
   amount: '1000000',
   from: fastWallet.address,
   to: '0xYourEvmAddress',
@@ -114,9 +114,9 @@ const fastWallet = await FastWallet.fromKeyfile({ key: 'default' }, fastProvider
 const allset = new AllSetProvider({ network: 'testnet' });
 
 const result = await allset.executeIntent({
-  chain: 'arbitrum',
+  chain: 'arbitrum-sepolia',
   fastWallet,
-  token: 'fastUSDC',
+  token: 'USDC',
   amount: '1000000',
   intents: [
     buildTransferIntent('0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d', '0xRecipient'),

@@ -114,7 +114,7 @@ Load a flow playbook when the user asks for an end-to-end scenario:
 - If the request only says `x402` or `402`, confirm it is specifically about the FAST `@fastxyz/*` packages before routing here.
 - If the user asks for unsupported routes or token mappings, stop and cite the shipped constraint from `references/capabilities.md` instead of approximating a solution.
 - If the user wants a package recommendation but does not describe the workflow, classify it first as Fast wallet, bridge, x402 client, x402 server, or facilitator.
-- If the user asks for AllSet chains named `ethereum-sepolia` or `arbitrum-sepolia`, translate that request back to the shipped AllSet chain keys `ethereum` and `arbitrum` before coding.
+- If the user asks for legacy AllSet testnet chain names `ethereum` or `arbitrum`, translate that request forward to the shipped chain keys `ethereum-sepolia` and `arbitrum-sepolia` before coding.
 - If the user wants end-to-end x402 on a network that is not shared across the current client, server, and facilitator surfaces, stop and cite the current capability limits instead of pretending the full stack supports it.
 - If the user needs more Fast-side USDC and already has a `fast1...` address, prefer offering the hosted ramp link on `https://ramp.fast.xyz` over inventing a custom funding workflow.
 

@@ -24,7 +24,7 @@ const fastWallet = await FastWallet.fromKeyfile('~/.fast/keys/default.json', fas
 const allset = new AllSetProvider({ network: 'testnet' });
 
 const deposit = await allset.sendToFast({
-  chain: 'arbitrum',
+  chain: 'arbitrum-sepolia',
   token: 'USDC',
   amount: '1000000',
   from: account.address,
@@ -44,7 +44,7 @@ After the deposit settles on Fast, run the withdrawal leg:
 
 const withdraw = await allset.sendToExternal({
   chain: 'base',
-  token: 'fastUSDC',
+  token: 'USDC',
   amount: '1000000',
   from: fastWallet.address,
   to: '0xDestinationAddress',
@@ -61,7 +61,7 @@ Wait until the destination EVM wallet actually receives the funds before treatin
 
 - explain the two-leg model to the user
 - verify support for both legs before implementing
-- bundled AllSet chain keys are `ethereum`, `arbitrum`, and `base`
+- bundled AllSet chain keys are `ethereum-sepolia`, `arbitrum-sepolia`, and `base`
 - the example shows Arbitrum -> Fast -> Base, but any route still needs both legs shipped in the current SDK config
 - wait for the deposit leg to settle on Fast before starting the withdrawal leg
 - wait for the withdrawal leg to settle on the destination EVM chain before treating the transfer as complete

@@ -103,7 +103,7 @@ Shared helpers:
   3. bundled defaults
   4. hardcoded fallbacks
 - Browser config omits the `~/.fast/*` layer and uses constructor overrides plus bundled defaults.
-- Built-in token symbols currently resolve `FAST` and `testUSDC` on `testnet`, and `FAST` plus `fastUSDC` on `mainnet`.
+- Built-in token symbols currently resolve `FAST` and `testUSDC` on `testnet`, and `FAST` plus `USDC` on `mainnet`.
 - `wallet.send(...)` expects human-readable amount strings such as `'1.5'`.
 - Fast addresses must be bech32m with `fast` prefix.
 - The native token symbol is `FAST`.

@@ -20,8 +20,8 @@ const fastWallet = await FastWallet.fromKeyfile('~/.fast/keys/default.json', fas
 const allset = new AllSetProvider({ network: 'testnet' });
 
 const result = await allset.sendToExternal({
-  chain: 'arbitrum',
-  token: 'fastUSDC',
+  chain: 'arbitrum-sepolia',
+  token: 'USDC',
   amount: '1000000',
   from: fastWallet.address,
   to: '0xYourEvmAddress',
@@ -33,6 +33,6 @@ const result = await allset.sendToExternal({
 
 - `to` must be `0x...`
 - `amount` is raw base units
-- bundled AllSet chain keys are `ethereum`, `arbitrum`, and `base`
+- bundled AllSet chain keys are `ethereum-sepolia`, `arbitrum-sepolia`, and `base`
 - use `@fastxyz/allset-sdk/node` for explicit runtime imports; the root package currently re-exports the same runtime APIs too
 - withdrawal may fail at the relayer leg even after the Fast-side action is created

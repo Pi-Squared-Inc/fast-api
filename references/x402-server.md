@@ -84,13 +84,15 @@ This package is not the settlement engine. For working payment verification and 
 
 - The only hard-rejected alias is `fast`. Most other network strings are accepted by the builder.
 - Built-in `NETWORK_CONFIGS` currently resolve concrete asset metadata for:
+  - `fast-testnet`
   - `fast-mainnet`
+  - `arbitrum-sepolia`
   - `arbitrum`
+  - `ethereum-sepolia`
   - `ethereum`
   - `base`
   - `base-sepolia`
 - Any other network name falls back to generic asset `0x0000000000000000000000000000000000000000` with 6 decimals.
-- Hard cutover: do not describe `fast-testnet`, `arbitrum-sepolia`, or `ethereum-sepolia` as turnkey defaults in this package today.
 - Route acceptance still does not guarantee that the facilitator can verify or settle that network.
 
 Use explicit route assets and capability checks when you need anything outside the current built-in config.

@@ -53,13 +53,15 @@ Fast payments do not need settlement because the payment is already on-chain.
 - `evmPrivateKey`: required for EVM settlement, because the facilitator pays gas
 - `fastRpcUrl`: optional override for Fast verification
 - `committeePublicKeys`: optional override for trusted Fast committee keys
-- `chains`: declared in the public type, but the current verify / settle path still uses the built-in chain map
+- `chains`: declared in the public type and extends the built-in chain map
 
 ## Supported Networks In Code
 
 EVM:
 
+- `arbitrum-sepolia`
 - `arbitrum`
+- `ethereum-sepolia`
 - `ethereum`
 - `base`
 - `base-sepolia`
@@ -67,8 +69,6 @@ EVM:
 Fast:
 
 - `fast-testnet`, `fast-mainnet`
-
-Hard cutover: `arbitrum-sepolia` and `ethereum-sepolia` are not in the current built-in EVM chain map. `verify(...)` and `settle(...)` return `invalid_network` for them.
 
 ## Operational Rules
 

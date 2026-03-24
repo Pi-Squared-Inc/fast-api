@@ -38,7 +38,7 @@ const result = await x402Pay({
 });
 ```
 
-That only enables the bridge path. The current shipped helper still needs the server to ask for a network that resolves a bundled bridge config, which is currently `base`.
+That only enables the bridge path. The current shipped helper still needs the server to ask for a network that resolves a bundled bridge config, which currently means `ethereum-sepolia`, `arbitrum-sepolia`, or `base`.
 
 ## Flow
 
@@ -53,7 +53,7 @@ That only enables the bridge path. The current shipped helper still needs the se
 
 - if both Fast and EVM are accepted, the client prefers Fast
 - auto-bridge depends on explicit bridge helper configs, not a generic any-chain path
-- the shipped auto-bridge helper currently resolves only the bundled `base` path
+- the shipped auto-bridge helper currently resolves explicit bundled configs for `ethereum-sepolia`, `arbitrum-sepolia`, and `base`
 - the `402` response must not be trusted by itself; pin expectations locally and reject mismatches
 - if a Fast payment requirement omits `asset`, the client falls back to native `FAST`
 - require explicit approval before using both wallets for auto-bridge
